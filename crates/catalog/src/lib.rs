@@ -3,6 +3,7 @@
 //! `Criterion` filter registry land in M1/M2.
 
 mod catalog;
+pub mod command;
 mod error;
 pub mod repo;
 mod schema;

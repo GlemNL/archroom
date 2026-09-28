@@ -17,7 +17,7 @@ pub mod preview;
 
 pub use error::{Error, Result};
 
-pub use archroom_catalog::repo;
+pub use archroom_catalog::{command, repo};
 pub use archroom_jobs::JobHandle;
 pub use archroom_preview::{
     DEFAULT_PARAMS_HASH, L1_BUDGET_PX, L2_BUDGET_PX, LEVEL_L1, LEVEL_L2, PreviewCache,

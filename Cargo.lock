@@ -461,6 +461,8 @@ dependencies = [
  "archroom-services",
  "archroom-ui",
  "egui",
+ "rusqlite",
+ "tempfile",
 ]
 
 [[package]]

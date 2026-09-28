@@ -10,8 +10,10 @@ mod appcx;
 mod module;
 mod registry;
 mod selection;
+mod undo;
 
 pub use appcx::AppCx;
 pub use module::{Action, Module, ModuleId};
 pub use registry::ModuleRegistry;
 pub use selection::{LibrarySource, Selection};
+pub use undo::UndoStack;

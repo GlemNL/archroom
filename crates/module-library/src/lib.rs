@@ -9,7 +9,9 @@ mod import_dialog;
 mod left_panel;
 mod loupe;
 mod photos;
+mod shortcuts;
 
+use archroom_services::command::{RotatePhotos, SetFlag};
 use archroom_shell::{AppCx, Module, ModuleId};
 use import_dialog::ImportDialogState;
 use photos::LibraryData;
@@ -116,6 +118,48 @@ impl Module for LibraryModule {
             }
         }
 
+        ui.separator();
+        let has_target = cx.selection.selected_count() > 0 || cx.selection.active.is_some();
+        ui.add_enabled_ui(has_target, |ui| {
+            if ui.button("Pick").on_hover_text("P").clicked() {
+                let _ = cx.apply_command(Box::new(SetFlag::new(shortcuts::targets(cx), 1)));
+            }
+            if ui.button("Reject").on_hover_text("X").clicked() {
+                let _ = cx.apply_command(Box::new(SetFlag::new(shortcuts::targets(cx), -1)));
+            }
+            shortcuts::label_picker(ui, cx);
+            if ui
+                .button("⟲")
+                .on_hover_text("Rotate left (Ctrl+[)")
+                .clicked()
+            {
+                let _ = cx.apply_command(Box::new(RotatePhotos::new(shortcuts::targets(cx), -1)));
+            }
+            if ui
+                .button("⟳")
+                .on_hover_text("Rotate right (Ctrl+])")
+                .clicked()
+            {
+                let _ = cx.apply_command(Box::new(RotatePhotos::new(shortcuts::targets(cx), 1)));
+            }
+        });
+
+        ui.separator();
+        if ui
+            .add_enabled(cx.undo.can_undo(), egui::Button::new("↶"))
+            .on_hover_text(cx.undo.undo_label().unwrap_or_else(|| "Undo".to_string()))
+            .clicked()
+        {
+            let _ = cx.undo();
+        }
+        if ui
+            .add_enabled(cx.undo.can_redo(), egui::Button::new("↷"))
+            .on_hover_text(cx.undo.redo_label().unwrap_or_else(|| "Redo".to_string()))
+            .clicked()
+        {
+            let _ = cx.redo();
+        }
+
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let enabled = cx.catalog_open() && self.import_dialog.is_none();
             if ui
@@ -140,6 +184,9 @@ impl Module for LibraryModule {
                 ui.label("No photos yet — import to get started.");
             });
         } else {
+            let ordered = self.data.ordered_ids();
+            shortcuts::handle(ui, cx, &ordered);
+
             match self.view {
                 View::Grid => {
                     if let Some(id) = grid::show(ui, cx, &self.data.photos, self.thumbnail_size) {

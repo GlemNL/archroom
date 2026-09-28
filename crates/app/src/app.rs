@@ -100,6 +100,27 @@ impl ArchroomApp {
         if tab_pressed {
             self.show_side_panels = !self.show_side_panels;
         }
+
+        // Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) — plan §10.3. Library's is the
+        // only undo stack that exists yet (Develop's is separate, persisted
+        // per-photo history, M3 work), so this always targets it; harmless
+        // in Develop today since nothing pushes to it from there.
+        let (undo_pressed, redo_pressed) = ctx.input(|i| {
+            let cmd = i.modifiers.command;
+            let undo = cmd && !i.modifiers.shift && i.key_pressed(egui::Key::Z);
+            let redo = (cmd && i.modifiers.shift && i.key_pressed(egui::Key::Z))
+                || (cmd && i.key_pressed(egui::Key::Y));
+            (undo, redo)
+        });
+        if undo_pressed {
+            if let Some(Err(e)) = self.cx.undo() {
+                error!(error = %e, "undo failed");
+            }
+        } else if redo_pressed {
+            if let Some(Err(e)) = self.cx.redo() {
+                error!(error = %e, "redo failed");
+            }
+        }
     }
 }
 

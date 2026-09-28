@@ -173,6 +173,28 @@ fn show_cell(
             Color32::from_rgb(0xff, 0xc1, 0x07),
         );
     }
+    if let Some(color) = photo.color_label.as_deref().and_then(color_label_swatch) {
+        painter.rect_filled(
+            egui::Rect::from_min_size(
+                egui::pos2(
+                    rect.max.x - 14.0,
+                    rect.max.y - LABEL_HEIGHT - CELL_PADDING - 6.0,
+                ),
+                Vec2::new(10.0, 6.0),
+            ),
+            CornerRadius::same(1),
+            color,
+        );
+    }
+    if photo.user_orientation != 0 {
+        painter.text(
+            egui::pos2(rect.min.x + CELL_PADDING, badge_y),
+            egui::Align2::LEFT_TOP,
+            "⟳",
+            egui::FontId::proportional(13.0),
+            Color32::from_gray(0xd0),
+        );
+    }
 
     // Filename label.
     ui.painter().text(
@@ -197,6 +219,18 @@ fn show_cell(
 
     response.on_hover_text(&photo.filename);
     double_clicked
+}
+
+/// Adobe's five label names (plan D5) to a swatch color for the badge.
+pub fn color_label_swatch(label: &str) -> Option<Color32> {
+    match label {
+        "Red" => Some(Color32::from_rgb(0xe5, 0x39, 0x35)),
+        "Yellow" => Some(Color32::from_rgb(0xfd, 0xd8, 0x35)),
+        "Green" => Some(Color32::from_rgb(0x4c, 0xaf, 0x50)),
+        "Blue" => Some(Color32::from_rgb(0x42, 0x85, 0xf4)),
+        "Purple" => Some(Color32::from_rgb(0x9c, 0x27, 0xb0)),
+        _ => None,
+    }
 }
 
 fn truncate_filename(name: &str, max: usize) -> String {

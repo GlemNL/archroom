@@ -15,3 +15,7 @@ archroom-jobs = { workspace = true }
 archroom-services = { workspace = true }
 archroom-ui = { workspace = true }
 egui = "0.33"
+rusqlite = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

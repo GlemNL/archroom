@@ -96,6 +96,25 @@ impl Selection {
             self.active = self.selected.iter().next().copied();
         }
     }
+
+    /// Moves the active photo by `delta` positions within `ordered` and
+    /// replaces the selection with just that photo — Loupe's previous/next
+    /// (plan §7.3) and the Grid's `Shift+`rating/flag auto-advance (§7.4)
+    /// share this.
+    pub fn advance(&mut self, ordered: &[PhotoId], delta: isize) {
+        if ordered.is_empty() {
+            return;
+        }
+        let Some(active) = self.active else {
+            self.select_single(ordered[0]);
+            return;
+        };
+        let Some(idx) = ordered.iter().position(|&id| id == active) else {
+            return;
+        };
+        let new_idx = (idx as isize + delta).clamp(0, ordered.len() as isize - 1) as usize;
+        self.select_single(ordered[new_idx]);
+    }
 }
 
 #[cfg(test)]
@@ -145,6 +164,28 @@ mod tests {
         let mut sel = Selection::default();
         sel.select_range(&ordered, ordered[1]);
         assert_eq!(sel.selected().collect::<Vec<_>>(), vec![PhotoId::new(2)]);
+    }
+
+    #[test]
+    fn advance_clamps_at_the_ends() {
+        let ordered = ids(3);
+        let mut sel = Selection::default();
+        sel.select_single(ordered[0]);
+        sel.advance(&ordered, -1);
+        assert_eq!(
+            sel.active,
+            Some(ordered[0]),
+            "must not go below the first photo"
+        );
+
+        sel.advance(&ordered, 1);
+        sel.advance(&ordered, 1);
+        sel.advance(&ordered, 1);
+        assert_eq!(
+            sel.active,
+            Some(ordered[2]),
+            "must not go past the last photo"
+        );
     }
 
     #[test]

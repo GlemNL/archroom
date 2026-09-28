@@ -81,4 +81,8 @@ impl LibraryData {
         let still_present: BTreeSet<_> = self.photos.iter().map(|p| p.photo_id).collect();
         cx.selection.retain(&still_present);
     }
+
+    pub fn ordered_ids(&self) -> Vec<archroom_core::ids::PhotoId> {
+        self.photos.iter().map(|p| p.photo_id).collect()
+    }
 }

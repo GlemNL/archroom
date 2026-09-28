@@ -206,11 +206,14 @@ pub struct PhotoSummary {
     pub flag: i32,
     pub color_label: Option<String>,
     pub missing: bool,
+    /// Quarter turns applied by the user (0..=3), plan §7.4's non-destructive rotate.
+    pub user_orientation: i32,
 }
 
 const PHOTO_SUMMARY_COLUMNS: &str =
     "p.id, f.id, f.folder_id, f.filename, f.kind, f.width, f.height,
-     f.orientation, f.capture_time, f.camera_model, p.rating, p.flag, p.color_label, f.missing";
+     f.orientation, f.capture_time, f.camera_model, p.rating, p.flag, p.color_label, f.missing,
+     p.user_orientation";
 
 fn photo_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PhotoSummary> {
     Ok(PhotoSummary {
@@ -228,6 +231,7 @@ fn photo_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PhotoSumm
         flag: row.get(11)?,
         color_label: row.get(12)?,
         missing: row.get::<_, i64>(13)? != 0,
+        user_orientation: row.get(14)?,
     })
 }
 
