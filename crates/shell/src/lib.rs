@@ -9,7 +9,9 @@
 mod appcx;
 mod module;
 mod registry;
+mod selection;
 
 pub use appcx::AppCx;
 pub use module::{Action, Module, ModuleId};
 pub use registry::ModuleRegistry;
+pub use selection::{LibrarySource, Selection};

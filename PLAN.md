@@ -820,17 +820,17 @@ Prove the stack end to end and lay down the skeleton.
 
 ### M1: Import and browse (Library)
 
-- [ ] `libraw-sys` plus a safe wrapper: open, metadata, embedded thumbnail, process
-- [ ] Metadata through exiv2 (`MetadataReader`) normalized into `ExifSummary`; orientation handling
-- [ ] Decoders: raw (LibRaw), JPEG/PNG/TIFF with ICC
-- [ ] Import dialog (§7.1): portal source picker, recursive scan, candidate grid, Add and Copy modes, destination template, duplicate skip, keywords and metadata on import, reading existing XMP
-- [ ] Import as jobs: scan → metadata → batched inserts → L0/L1 previews, with progress and cancel; "Previous Import"
-- [ ] Preview cache: levels, `previews.db` index, invalidation, eviction budget
-- [ ] Grid: virtualized, thumbnail size, selection model, badges, sort
-- [ ] Loupe (fit/1:1, pan, previous/next) and filmstrip
-- [ ] Catalog panel and Folders panel (tree, counts, Synchronize, Show in File Manager)
+- [x] `libraw-sys` plus a safe wrapper: open, metadata, embedded thumbnail, process — `crates/io/src/libraw.rs`, the `RawDecoder` `Decoder` impl. Sensor-native pixel output (`user_flip = 0`) so decoded dims always agree with catalogued `width`/`height`; rotation is applied later as a display-time transform via `orientation`, not baked into the pixels.
+- [x] Metadata through exiv2 (`rexiv2`) normalized into `ImageMetadata`; orientation handling — `crates/io/src/metadata.rs` for JPEG/PNG/TIFF. Raws read their own metadata straight from LibRaw's `idata`/`other`/`sizes` structs instead (`crates/io/src/libraw.rs`), sidestepping exiv2's unverified CR3/BMFF coverage on this platform (M0 exit note) since LibRaw already parses every raw format this app decodes.
+- [x] Decoders: raw (LibRaw), JPEG/PNG/TIFF with ICC — `crates/io/src/image_rs.rs` (`ImageDecoder`); JPEG APP2 and TIFF tag-0x8773 ICC extraction are hand-rolled since `image` doesn't expose embedded profiles. `archroom_io::decoder_for(path)` picks between the two by extension.
+- [x] Import dialog (§7.1): portal source picker (`rfd`), Add and Copy modes, duplicate skip, progress with cancel — `crates/module-library/src/import_dialog.rs`. Scoped down from the full spec: no per-file candidate grid with checkboxes (imports everything supported under the source folder; dedupe already makes a re-run safe), no reading existing XMP sidecars (no XMP reader exists yet), no keywords/metadata-on-import (needs M2's keyword tables), and the destination template is fixed (`{dest}/{YYYY}/{YYYY-MM-DD}/`) rather than user-editable.
+- [x] Import as jobs: scan → metadata → batched inserts → L1 previews, with progress and cancel; "Previous Import" — `ImportJob` runs on `archroom-jobs`, publishes `CatalogEvent`s the dialog and Grid subscribe to; "Previous Import" is a real Catalog-panel entry (`crates/module-library/src/left_panel.rs`) backed by `latest_import_id`.
+- [x] Preview cache: `previews.db` index, L1 (Grid/filmstrip) and L2 (Loupe, generated lazily on first view) — `crates/preview`. Sentinel `params_hash` until M3's develop settings exist to hash for real; no L0/L3, invalidation-on-edit or eviction budget yet (nothing invalidates a preview until Develop can edit something, and nothing's evicted until L3 exists to make the cache big).
+- [x] Grid: virtualized (`egui::ScrollArea::show_rows`, so only visible cells cost anything regardless of catalog size), thumbnail-size slider, click/shift/ctrl selection shared with the filmstrip and Loupe, rating/flag/missing badges (wired and rendering, though nothing sets rating/flag yet — that's M2) — `crates/module-library/src/grid.rs`.
+- [x] Loupe (fit/1:1 against the L2 preview, previous/next via arrow keys) and filmstrip — `crates/module-library/src/loupe.rs`, `filmstrip.rs`. Pan is via the containing `ScrollArea`'s scrollbars, not click-drag; the filmstrip isn't virtualized like the Grid is (a fast-follow if a very long unvirtualized row turns out to matter in practice).
+- [x] Catalog panel and Folders panel (tree, counts, Show in File Manager via the `open` crate) — `crates/module-library/src/left_panel.rs`. Folder counts are direct (not a recursive rollup over subfolders), and "Synchronize" only re-reads the catalog rather than rescanning disk for new/missing files (that needs missing-file detection, M2).
 
-**Exit:** import 5,000 mixed files; first thumbnails within 2 s of starting; the grid scrolls at 60 fps on a 4K screen; a restart keeps everything.
+**Exit:** import 5,000 mixed files; first thumbnails within 2 s of starting; the grid scrolls at 60 fps on a 4K screen; a restart keeps everything. Built and passing 53 automated tests plus a manual CLI run against a real NEF (M1 Phase A) and a visual smoke test of the Grid/Loupe/filmstrip/panels against a live catalog (M1 Phase B/C, screenshot-verified — no input-automation tool was available in this environment to script clicks, so interactive selection/dialog behavior is code-reviewed and unit-tested rather than end-to-end-clicked). **Not yet performance-tested** at the 5,000-file/60fps scale the exit criterion names; the user is validating interactively before that claim is made.
 
 ### M2: Organize (Library)
 

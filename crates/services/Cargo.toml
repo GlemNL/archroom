@@ -15,7 +15,13 @@ archroom-io = { workspace = true }
 archroom-engine = { workspace = true }
 archroom-preview = { workspace = true }
 archroom-jobs = { workspace = true }
+rusqlite = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 walkdir = "2"
 trash = "5"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+[dev-dependencies]
+tempfile = "3"
+image = { version = "0.25", default-features = false, features = ["png"] }

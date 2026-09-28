@@ -25,6 +25,9 @@ pub trait Module {
     fn right_panel(&mut self, _ui: &mut egui::Ui, _cx: &mut AppCx) {}
     fn toolbar(&mut self, _ui: &mut egui::Ui, _cx: &mut AppCx) {}
     fn center(&mut self, ui: &mut egui::Ui, cx: &mut AppCx);
+    /// Shared between Library and Develop in real Lightroom (plan §7.3);
+    /// a no-op until a module has photos to show a strip of.
+    fn filmstrip(&mut self, _ui: &mut egui::Ui, _cx: &mut AppCx) {}
 
     fn handle_action(&mut self, _action: Action, _cx: &mut AppCx) -> bool {
         false

@@ -36,6 +36,7 @@ pub struct ArchroomApp {
 impl ArchroomApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         archroom_ui::apply_theme(&cc.egui_ctx);
+        egui_extras::install_image_loaders(&cc.egui_ctx);
 
         let jobs = Arc::new(Scheduler::new(0));
         let job_events = jobs.events();
@@ -49,6 +50,12 @@ impl ArchroomApp {
         match Catalog::create_or_open(&catalog_path) {
             Ok(catalog) => {
                 info!(path = %catalog_path.display(), "catalog ready");
+
+                match archroom_services::PreviewCache::open_for_catalog(&catalog_path) {
+                    Ok(previews) => cx.previews = Some(previews),
+                    Err(e) => error!(error = %e, "failed to open preview cache"),
+                }
+
                 cx.settings.last_catalog = Some(catalog_path);
                 if let Err(e) = cx.settings.save() {
                     error!(error = %e, "failed to save settings");
@@ -144,6 +151,12 @@ impl eframe::App for ArchroomApp {
                     self.registry.active_mut().right_panel(ui, &mut self.cx);
                 });
         }
+
+        egui::TopBottomPanel::bottom("filmstrip")
+            .min_height(96.0)
+            .show(ctx, |ui| {
+                self.registry.active_mut().filmstrip(ui, &mut self.cx);
+            });
 
         egui::TopBottomPanel::bottom("toolbar").show(ctx, |ui| {
             ui.horizontal(|ui| {

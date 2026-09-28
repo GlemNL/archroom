@@ -11,6 +11,7 @@ macro_rules! id_type {
             Debug,
             Clone,
             Copy,
+            Default,
             PartialEq,
             Eq,
             PartialOrd,

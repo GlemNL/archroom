@@ -10,10 +10,11 @@ workspace = true
 
 [dependencies]
 archroom-core = { workspace = true }
+archroom-services = { workspace = true }
 archroom-shell = { workspace = true }
 archroom-ui = { workspace = true }
+crossbeam-channel = { workspace = true }
 egui = "0.33"
-egui_extras = { version = "0.33", features = ["image"] }
+rfd = "0.15"
+open = "5"
 tracing = { workspace = true }
-
-# archroom-services joins once Library needs import/catalog queries (M1/M2).

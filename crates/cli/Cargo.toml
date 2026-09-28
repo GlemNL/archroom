@@ -15,9 +15,10 @@ workspace = true
 [dependencies]
 archroom-core = { workspace = true }
 archroom-catalog = { workspace = true }
+archroom-services = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 
-# archroom-io, archroom-engine, archroom-preview and archroom-services join
-# once `render` (M3), `import` (M1) and `export` (M5) are implemented.
+# archroom-io, archroom-engine and archroom-preview join once `render` (M3)
+# and `export` (M5) are implemented.

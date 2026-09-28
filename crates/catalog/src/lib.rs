@@ -4,6 +4,7 @@
 
 mod catalog;
 mod error;
+pub mod repo;
 mod schema;
 
 pub use catalog::Catalog;

@@ -18,6 +18,7 @@ archroom-catalog = { workspace = true }
 archroom-jobs = { workspace = true }
 archroom-shell = { workspace = true }
 archroom-ui = { workspace = true }
+archroom-services = { workspace = true }
 archroom-module-library = { workspace = true }
 archroom-module-develop = { workspace = true }
 # M0 spike only (see src/spike_view.rs) — the real Develop module reaches
@@ -26,6 +27,11 @@ archroom-io = { workspace = true }
 archroom-engine = { workspace = true }
 eframe = { version = "0.33", default-features = false, features = ["default_fonts", "wgpu", "persistence", "wayland", "x11", "accesskit"] }
 egui = "0.33"
+# "file" + "image": the Grid/Loupe (module-library) load preview JPEGs via
+# `egui::Image::from_uri("file://…")`. Loaders are installed once here, at
+# app startup; egui_extras's vendored `image` crate picks up jpeg/png/tiff
+# support for free via Cargo's feature unification with archroom-io's.
+egui_extras = { version = "0.33", features = ["file", "image"] }
 # eframe's own `wgpu` dependency turns off all backends (default-features =
 # false with no backend feature); Cargo unifies features for a shared crate
 # version, so this direct dependency is what actually turns Vulkan on
