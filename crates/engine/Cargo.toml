@@ -1,0 +1,24 @@
+[package]
+name = "archroom-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+archroom-core = { workspace = true }
+archroom-color = { workspace = true }
+archroom-io = { workspace = true }
+wgpu = { version = "27", default-features = false, features = ["vulkan", "wgsl"] }
+bytemuck = { version = "1", features = ["derive"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+pollster = "0.4"
+
+[dev-dependencies]
+proptest = "1"

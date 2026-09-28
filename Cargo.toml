@@ -1,0 +1,84 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/core",
+    "crates/color",
+    "crates/libraw-sys",
+    "crates/io",
+    "crates/catalog",
+    "crates/jobs",
+    "crates/engine",
+    "crates/preview",
+    "crates/services",
+    "crates/ui-kit",
+    "crates/module-library",
+    "crates/module-develop",
+    "crates/app",
+    "crates/cli",
+    "crates/xtask",
+    "crates/shell",
+]
+default-members = ["crates/app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/archroom/archroom"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "warn"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+todo = "warn"
+dbg_macro = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+
+# Internal crates, referenced by path + version so the workspace can also be
+# published later without churning every Cargo.toml.
+[workspace.dependencies]
+archroom-core = { path = "crates/core", version = "0.1.0" }
+archroom-color = { path = "crates/color", version = "0.1.0" }
+libraw-sys = { path = "crates/libraw-sys", version = "0.1.0" }
+archroom-io = { path = "crates/io", version = "0.1.0" }
+archroom-catalog = { path = "crates/catalog", version = "0.1.0" }
+archroom-jobs = { path = "crates/jobs", version = "0.1.0" }
+archroom-engine = { path = "crates/engine", version = "0.1.0" }
+archroom-preview = { path = "crates/preview", version = "0.1.0" }
+archroom-services = { path = "crates/services", version = "0.1.0" }
+archroom-ui = { path = "crates/ui-kit", version = "0.1.0" }
+archroom-shell = { path = "crates/shell", version = "0.1.0" }
+archroom-module-library = { path = "crates/module-library", version = "0.1.0" }
+archroom-module-develop = { path = "crates/module-develop", version = "0.1.0" }
+
+# Shared third-party dependencies (kept in one place so every crate uses the
+# same version). Exact versions are pinned in Cargo.lock.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rayon = "1"
+crossbeam-channel = "0.5"
+directories = "5"
+rusqlite = { version = "0.39", features = ["bundled", "backup"] }
+rusqlite_migration = "=2.5.0"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[profile.bench]
+inherits = "release"

@@ -1,0 +1,18 @@
+[package]
+name = "archroom-module-develop"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+archroom-core = { workspace = true }
+archroom-shell = { workspace = true }
+archroom-ui = { workspace = true }
+egui = "0.33"
+tracing = { workspace = true }
+
+# archroom-services joins once Develop has a canvas to render into (M3).

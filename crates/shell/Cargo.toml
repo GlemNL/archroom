@@ -1,0 +1,21 @@
+[package]
+name = "archroom-shell"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+archroom-core = { workspace = true }
+archroom-catalog = { workspace = true }
+archroom-jobs = { workspace = true }
+archroom-ui = { workspace = true }
+egui = "0.33"
+
+# archroom-services joins once AppCx needs its types (selection, previews —
+# M1/M2). Left out for now so `shell`, the module crates and `app` can
+# build without pulling in `archroom-io`'s system-library requirements
+# (libraw, gexiv2) before they're actually needed.

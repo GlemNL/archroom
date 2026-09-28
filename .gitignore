@@ -1,0 +1,14 @@
+/target
+**/*.rs.bk
+*.pdb
+
+# Local catalogs and caches created by running the app during development.
+/dev-data/
+*.arcat
+*.arcat-wal
+*.arcat-shm
+
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

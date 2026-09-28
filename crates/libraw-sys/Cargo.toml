@@ -1,0 +1,17 @@
+[package]
+name = "libraw-sys"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license = "LGPL-2.1-or-later OR CDDL-1.0"
+links = "raw"
+build = "build.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.73"
+pkg-config = "0.3"

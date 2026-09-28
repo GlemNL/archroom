@@ -1,0 +1,21 @@
+[package]
+name = "archroom-services"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+archroom-core = { workspace = true }
+archroom-catalog = { workspace = true }
+archroom-io = { workspace = true }
+archroom-engine = { workspace = true }
+archroom-preview = { workspace = true }
+archroom-jobs = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+walkdir = "2"
+trash = "5"

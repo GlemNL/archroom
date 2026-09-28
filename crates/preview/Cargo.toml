@@ -1,0 +1,20 @@
+[package]
+name = "archroom-preview"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+archroom-core = { workspace = true }
+archroom-catalog = { workspace = true }
+archroom-engine = { workspace = true }
+archroom-io = { workspace = true }
+rusqlite = { workspace = true }
+fast_image_resize = "6"
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
