@@ -49,6 +49,7 @@ pub struct ImageMetadata {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Priority(pub u8);
 
+#[derive(Debug, Clone, Copy, Default)]
 pub struct DecodeOptions {
     /// `None` decodes at full resolution; `Some(n)` requests an
     /// approximately `n`-px-long-edge proxy where the decoder can produce

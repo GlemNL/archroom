@@ -1,3 +1,7 @@
+// Build scripts have no better error-reporting path than panicking with a
+// clear message; that's the standard idiom, not a lapse.
+#![allow(clippy::expect_used)]
+
 use std::env;
 use std::path::PathBuf;
 
