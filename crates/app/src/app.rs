@@ -7,6 +7,8 @@ use archroom_shell::{AppCx, ModuleRegistry};
 use crossbeam_channel::Receiver;
 use tracing::{error, info};
 
+use crate::spike_view::SpikeView;
+
 /// `~/Pictures/Archroom/Archroom.arcat`, the default catalog location
 /// (plan §4.7). Falls back to `~/Archroom/Archroom.arcat` if the platform
 /// has no Pictures directory.
@@ -27,6 +29,8 @@ pub struct ArchroomApp {
     job_events: Receiver<archroom_jobs::JobEvent>,
     active_jobs: usize,
     show_side_panels: bool,
+    show_spike_window: bool,
+    spike_view: SpikeView,
 }
 
 impl ArchroomApp {
@@ -67,6 +71,8 @@ impl ArchroomApp {
             job_events,
             active_jobs: 0,
             show_side_panels: true,
+            show_spike_window: false,
+            spike_view: SpikeView::default(),
         }
     }
 
@@ -91,7 +97,7 @@ impl ArchroomApp {
 }
 
 impl eframe::App for ArchroomApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         self.drain_job_events();
         self.handle_global_shortcuts(ctx);
 
@@ -121,6 +127,7 @@ impl eframe::App for ArchroomApp {
                             if self.active_jobs == 1 { "" } else { "s" }
                         ));
                     }
+                    ui.toggle_value(&mut self.show_spike_window, "Spike (M0)");
                 });
             });
         });
@@ -147,5 +154,16 @@ impl eframe::App for ArchroomApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             self.registry.active_mut().center(ui, &mut self.cx);
         });
+
+        if self.show_spike_window {
+            if let Some(render_state) = frame.wgpu_render_state().cloned() {
+                egui::Window::new("M0 GPU Spike")
+                    .open(&mut self.show_spike_window)
+                    .default_size([640.0, 480.0])
+                    .show(ctx, |ui| {
+                        self.spike_view.ui(ui, &render_state);
+                    });
+            }
+        }
     }
 }

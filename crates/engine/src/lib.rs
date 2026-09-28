@@ -1,5 +1,8 @@
 //! `archroom-engine`: the `Op` registry, pipeline graph, stage cache and
-//! `wgpu` device (plan §4.1/§6). This is M3 work (plan roadmap); M0's GPU
-//! validation happens as a standalone spike instead of through this crate,
-//! so the `Op` registry can be designed once, correctly, in M3 rather than
-//! rushed for a proof-of-concept.
+//! `wgpu` device (plan §4.1/§6). The real registry and stage pipeline are
+//! M3 work (plan roadmap); `spike` is the M0 GPU-architecture validation
+//! (decode → wgpu → WGSL → egui), kept deliberately separate so the real
+//! `Op` registry gets designed once, correctly, in M3 rather than grown out
+//! of a proof-of-concept.
+
+pub mod spike;

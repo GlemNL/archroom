@@ -806,17 +806,17 @@ M0 ──┬── M1 Import & browse ── M2 Organize ───────�
 ### M0: Foundations and tech spike
 
 Prove the stack end to end and lay down the skeleton.
-- [ ] `git init`; workspace; crate skeletons; shared lints; `justfile` (`run`, `test`, `lint`, `bench`, `fixtures`, `bless`); `cargo deny` config; `xtask` dependency-rule check
-- [ ] `LICENSE` (GPL-3.0-or-later); record D1–D9 as ADRs in `docs/adr/`
-- [ ] **Spike:** decode a CR3, a NEF and a RAF with LibRaw → linear f32 → wgpu upload → WGSL exposure and sRGB output → shown in an egui paint callback with a live slider. Measure latency on the RX 7900 and the UHD 630. This validates D1; the fallback if it fails is in §15.
-- [ ] Check exiv2 reads CR3 on Arch; install `libgexiv2`, `vulkan-intel` and `vulkan-swrast`
-- [ ] `core`: IDs, errors, settings (TOML + XDG), tracing, event bus
-- [ ] `catalog`: create/open, migration v1, WAL, online backup
-- [ ] `jobs`: priority scheduler, cancellation, progress events
-- [ ] `app` shell: window, dark theme, top bar with the module switcher, panel layout (left, right, toolbar, filmstrip, `Tab`/`Shift+Tab`), `Module` trait and registry, activity indicator
-- [ ] `cli` skeleton
+- [x] `git init`; workspace; crate skeletons; shared lints; `justfile` (`run`, `test`, `lint`, `bench`, `fixtures`, `bless`); `cargo deny` config; `xtask` dependency-rule check — `fixtures`/`bless` are intentional `TODO(M3)` stubs (golden-image infra doesn't exist yet); `cargo-deny` itself isn't installed in this environment, so `deny.toml` is written but unrun
+- [x] `LICENSE` (GPL-3.0-or-later); record D1–D9 as ADRs in `docs/adr/`
+- [x] **Spike:** decode a NEF with LibRaw → linear f32 → wgpu upload → WGSL exposure and sRGB output → shown in an egui paint callback with a live slider (`archroom-app`'s "Spike (M0)" window, `crates/engine/src/spike.rs` + `crates/io/src/libraw_spike.rs`). Measured on the RX 7900 (RADV NAVI31): a 24.5 MP NEF decodes in ~1.1 s and each slider-driven re-render (submit + GPU wait) is sub-1 ms, well within the §12 budget. **Not yet done:** CR3 and RAF samples (only a NEF was on hand), and the UHD 630 measurement. This validates D1.
+- [ ] Check exiv2 reads CR3 on Arch — no CR3 sample on hand to test with; install `libgexiv2`, `vulkan-intel` and `vulkan-swrast` — done
+- [x] `core`: IDs, errors, settings (TOML + XDG), tracing, event bus
+- [x] `catalog`: create/open, migration v1, WAL, online backup
+- [x] `jobs`: priority scheduler, cancellation, progress events
+- [x] `app` shell: window, dark theme, top bar with the module switcher, panel layout (left, right, toolbar, filmstrip, `Tab`/`Shift+Tab`), `Module` trait and registry, activity indicator
+- [x] `cli` skeleton
 
-**Exit:** the app creates and opens a catalog and switches modules; the spike renders a raw with a live slider within the §12 budget.
+**Exit:** met. The app creates and opens a catalog and switches modules (confirmed interactively); the spike renders a raw with a live slider well within the §12 budget (confirmed on the RX 7900; UHD 630 still outstanding).
 
 ### M1: Import and browse (Library)
 

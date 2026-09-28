@@ -14,6 +14,7 @@ archroom-color = { workspace = true }
 archroom-io = { workspace = true }
 wgpu = { version = "27", default-features = false, features = ["vulkan", "wgsl"] }
 bytemuck = { version = "1", features = ["derive"] }
+half = { version = "2", features = ["bytemuck"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
