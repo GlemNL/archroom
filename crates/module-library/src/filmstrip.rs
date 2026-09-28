@@ -53,12 +53,14 @@ fn show_thumb(ui: &mut egui::Ui, cx: &mut AppCx, photo: &PhotoSummary) {
     let inner = rect.shrink(2.0);
     match preview_path {
         Some(path) => {
-            ui.put(
-                inner,
-                egui::Image::from_uri(format!("file://{}", path.display()))
-                    .fit_to_exact_size(inner.size())
-                    .maintain_aspect_ratio(true),
-            );
+            let mut image = egui::Image::from_uri(format!("file://{}", path.display()))
+                .fit_to_exact_size(inner.size())
+                .maintain_aspect_ratio(true);
+            let angle = crate::grid::orientation_angle(photo);
+            if angle != 0.0 {
+                image = image.rotate(angle, egui::Vec2::splat(0.5));
+            }
+            ui.put(inner, image);
         }
         None => {
             painter.rect_filled(

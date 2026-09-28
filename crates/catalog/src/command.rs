@@ -11,10 +11,11 @@
 //! holds these (plan §4.5) lives in `archroom-shell`, not here.
 
 use archroom_core::events::{CatalogEvent, PhotoField};
-use archroom_core::ids::PhotoId;
-use rusqlite::{Connection, params};
+use archroom_core::ids::{KeywordId, PhotoId};
+use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::error::Result;
+use crate::repo;
 
 pub trait Command: Send {
     fn label(&self) -> String;
@@ -263,20 +264,255 @@ impl Command for RotatePhotos {
     }
 }
 
+/// Adds one or more keywords to a set of photos (plan §7.5). Each name is
+/// a full path — `Places > France > Paris` creates the missing chain and
+/// attaches the leaf (plan §7.6's hierarchical keywords); a bare `Paris`
+/// is a one-segment path. Revert only removes the `(photo, keyword)`
+/// pairs this command actually added — a keyword already on a photo
+/// before `apply` stays untouched.
+#[derive(Debug)]
+pub struct AddKeywords {
+    photo_ids: Vec<PhotoId>,
+    names: Vec<String>,
+    added: Vec<(PhotoId, KeywordId)>,
+}
+
+impl AddKeywords {
+    pub fn new(photo_ids: Vec<PhotoId>, names: Vec<String>) -> Self {
+        Self {
+            photo_ids,
+            names,
+            added: Vec::new(),
+        }
+    }
+}
+
+impl Command for AddKeywords {
+    fn label(&self) -> String {
+        format!(
+            "Add Keyword{} ({} photo{})",
+            photo_count_suffix(self.names.len()),
+            self.photo_ids.len(),
+            photo_count_suffix(self.photo_ids.len())
+        )
+    }
+
+    fn apply(&mut self, conn: &Connection) -> Result<CatalogEvent> {
+        self.added.clear();
+        for name in &self.names {
+            let segments = repo::split_keyword_path(name);
+            if segments.is_empty() {
+                continue;
+            }
+            let refs: Vec<&str> = segments.iter().map(String::as_str).collect();
+            let keyword_id = repo::upsert_keyword_path(conn, &refs)?;
+            for &photo_id in &self.photo_ids {
+                let already_present: bool = conn.query_row(
+                    "SELECT count(*) FROM photo_keywords WHERE photo_id = ?1 AND keyword_id = ?2",
+                    params![photo_id.get(), keyword_id.get()],
+                    |r| r.get::<_, i64>(0),
+                )? > 0;
+                if !already_present {
+                    repo::add_photo_keyword(conn, photo_id, keyword_id)?;
+                    self.added.push((photo_id, keyword_id));
+                }
+            }
+        }
+        Ok(changed(&self.photo_ids, PhotoField::Keywords))
+    }
+
+    fn revert(&mut self, conn: &Connection) -> Result<CatalogEvent> {
+        for &(photo_id, keyword_id) in &self.added {
+            repo::remove_photo_keyword(conn, photo_id, keyword_id)?;
+        }
+        Ok(changed(&self.photo_ids, PhotoField::Keywords))
+    }
+}
+
+/// Removes one or more keywords (by full path, matching
+/// [`AddKeywords`]) from a set of photos. Revert only re-adds the
+/// `(photo, keyword)` pairs this command actually removed.
+#[derive(Debug)]
+pub struct RemoveKeywords {
+    photo_ids: Vec<PhotoId>,
+    names: Vec<String>,
+    removed: Vec<(PhotoId, KeywordId)>,
+}
+
+impl RemoveKeywords {
+    pub fn new(photo_ids: Vec<PhotoId>, names: Vec<String>) -> Self {
+        Self {
+            photo_ids,
+            names,
+            removed: Vec::new(),
+        }
+    }
+}
+
+impl Command for RemoveKeywords {
+    fn label(&self) -> String {
+        format!(
+            "Remove Keyword{} ({} photo{})",
+            photo_count_suffix(self.names.len()),
+            self.photo_ids.len(),
+            photo_count_suffix(self.photo_ids.len())
+        )
+    }
+
+    fn apply(&mut self, conn: &Connection) -> Result<CatalogEvent> {
+        self.removed.clear();
+        for name in &self.names {
+            let segments = repo::split_keyword_path(name);
+            if segments.is_empty() {
+                continue;
+            }
+            let refs: Vec<&str> = segments.iter().map(String::as_str).collect();
+            let Some(keyword_id) = repo::find_keyword_by_path(conn, &refs)? else {
+                continue;
+            };
+            for &photo_id in &self.photo_ids {
+                let present: bool = conn.query_row(
+                    "SELECT count(*) FROM photo_keywords WHERE photo_id = ?1 AND keyword_id = ?2",
+                    params![photo_id.get(), keyword_id.get()],
+                    |r| r.get::<_, i64>(0),
+                )? > 0;
+                if present {
+                    repo::remove_photo_keyword(conn, photo_id, keyword_id)?;
+                    self.removed.push((photo_id, keyword_id));
+                }
+            }
+        }
+        Ok(changed(&self.photo_ids, PhotoField::Keywords))
+    }
+
+    fn revert(&mut self, conn: &Connection) -> Result<CatalogEvent> {
+        for &(photo_id, keyword_id) in &self.removed {
+            repo::add_photo_keyword(conn, photo_id, keyword_id)?;
+        }
+        Ok(changed(&self.photo_ids, PhotoField::Keywords))
+    }
+}
+
+/// One editable IPTC core field (plan §7.6's Metadata panel): the `photos`
+/// columns the panel writes back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IptcField {
+    Title,
+    Caption,
+    Creator,
+    Copyright,
+}
+
+impl IptcField {
+    pub fn label(self) -> &'static str {
+        match self {
+            IptcField::Title => "Title",
+            IptcField::Caption => "Caption",
+            IptcField::Creator => "Creator",
+            IptcField::Copyright => "Copyright",
+        }
+    }
+
+    fn column(self) -> &'static str {
+        match self {
+            IptcField::Title => "title",
+            IptcField::Caption => "caption",
+            IptcField::Creator => "creator",
+            IptcField::Copyright => "copyright",
+        }
+    }
+}
+
+/// Sets one IPTC field on a set of photos (plan §7.6): `None` clears it.
+/// Revert restores every old per-photo value — batch edits where the
+/// photos started with different values still undo exactly.
+#[derive(Debug)]
+pub struct SetIptc {
+    photo_ids: Vec<PhotoId>,
+    field: IptcField,
+    value: Option<String>,
+    old: Vec<(PhotoId, Option<String>)>,
+}
+
+impl SetIptc {
+    pub fn new(photo_ids: Vec<PhotoId>, field: IptcField, value: Option<String>) -> Self {
+        Self {
+            photo_ids,
+            field,
+            value,
+            old: Vec::new(),
+        }
+    }
+}
+
+impl Command for SetIptc {
+    fn label(&self) -> String {
+        format!(
+            "{} {} ({} photo{})",
+            if self.value.is_some() { "Set" } else { "Clear" },
+            self.field.label(),
+            self.photo_ids.len(),
+            photo_count_suffix(self.photo_ids.len())
+        )
+    }
+
+    fn apply(&mut self, conn: &Connection) -> Result<CatalogEvent> {
+        self.old.clear();
+        let sql = format!(
+            "SELECT {} FROM photos WHERE id = ?1",
+            self.field.column()
+        );
+        for &photo_id in &self.photo_ids {
+            let previous = conn
+                .query_row(
+                    &sql,
+                    params![photo_id.get()],
+                    |row| row.get::<_, Option<String>>(0),
+                )
+                .optional()?
+                .flatten();
+            self.old.push((photo_id, previous));
+        }
+        let sql = format!(
+            "UPDATE photos SET {} = ?1 WHERE id = ?2",
+            self.field.column()
+        );
+        for &photo_id in &self.photo_ids {
+            conn.execute(&sql, params![self.value.as_deref(), photo_id.get()])?;
+        }
+        Ok(changed(&self.photo_ids, PhotoField::Metadata))
+    }
+
+    fn revert(&mut self, conn: &Connection) -> Result<CatalogEvent> {
+        for &(photo_id, ref previous) in &self.old {
+            conn.execute(
+                &format!("UPDATE photos SET {} = ?2 WHERE id = ?1", self.field.column()),
+                params![photo_id.get(), previous],
+            )?;
+        }
+        Ok(changed(&self.photo_ids, PhotoField::Metadata))
+    }
+}
+
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use crate::Catalog;
-    use crate::repo::{self, NewFile, NewPhoto};
+    use crate::repo;
 
     fn seed_photo(conn: &Connection) -> PhotoId {
+        seed_photo_named(conn, "a.jpg")
+    }
+
+    fn seed_photo_named(conn: &Connection, filename: &str) -> PhotoId {
         let folder = repo::upsert_folder_path(conn, std::path::Path::new("/a")).unwrap();
         let file_id = repo::insert_file(
             conn,
-            &NewFile {
+            &repo::NewFile {
                 folder_id: folder,
-                filename: "a.jpg",
+                filename,
                 ext: "jpg",
                 kind: "jpeg",
                 ..Default::default()
@@ -285,13 +521,14 @@ mod tests {
         .unwrap();
         repo::insert_photo(
             conn,
-            &NewPhoto {
+            &repo::NewPhoto {
                 file_id,
                 import_id: None,
             },
         )
         .unwrap()
     }
+
 
     fn open_test_catalog() -> (tempfile::TempDir, Catalog) {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -427,5 +664,171 @@ mod tests {
             )
             .unwrap();
         assert_eq!(o, 1);
+    }
+
+    #[test]
+    fn add_keywords_creates_and_attaches_then_reverts() {
+        let (_dir, catalog) = open_test_catalog();
+        let conn = catalog.connection();
+        let photo = seed_photo(conn);
+
+        let mut cmd = AddKeywords::new(vec![photo], vec!["Sunset".into(), "Beach".into()]);
+        cmd.apply(conn).unwrap();
+        assert_eq!(
+            repo::list_keywords_for_photo(conn, photo).unwrap().len(),
+            2
+        );
+
+        cmd.revert(conn).unwrap();
+        assert!(repo::list_keywords_for_photo(conn, photo).unwrap().is_empty());
+    }
+
+    #[test]
+    fn add_keywords_does_not_disturb_an_already_present_keyword_on_revert() {
+        let (_dir, catalog) = open_test_catalog();
+        let conn = catalog.connection();
+        let photo = seed_photo(conn);
+        let kw = repo::upsert_keyword(conn, None, "Sunset").unwrap();
+        repo::add_photo_keyword(conn, photo, kw).unwrap();
+
+        let mut cmd = AddKeywords::new(vec![photo], vec!["Sunset".into()]);
+        cmd.apply(conn).unwrap();
+        cmd.revert(conn).unwrap();
+
+        assert_eq!(repo::list_keywords_for_photo(conn, photo).unwrap(), vec![kw]);
+    }
+
+    #[test]
+    fn remove_keywords_detaches_then_reverts() {
+        let (_dir, catalog) = open_test_catalog();
+        let conn = catalog.connection();
+        let photo = seed_photo(conn);
+        let kw = repo::upsert_keyword(conn, None, "Sunset").unwrap();
+        repo::add_photo_keyword(conn, photo, kw).unwrap();
+
+        let mut cmd = RemoveKeywords::new(vec![photo], vec!["Sunset".into()]);
+        cmd.apply(conn).unwrap();
+        assert!(repo::list_keywords_for_photo(conn, photo).unwrap().is_empty());
+
+        cmd.revert(conn).unwrap();
+        assert_eq!(repo::list_keywords_for_photo(conn, photo).unwrap(), vec![kw]);
+    }
+
+    #[test]
+    fn remove_keywords_ignores_unknown_names() {
+        let (_dir, catalog) = open_test_catalog();
+        let conn = catalog.connection();
+        let photo = seed_photo(conn);
+
+        let mut cmd = RemoveKeywords::new(vec![photo], vec!["Nonexistent".into()]);
+        cmd.apply(conn).unwrap();
+        cmd.revert(conn).unwrap();
+    }
+
+    #[test]
+    fn add_keywords_creates_the_full_hierarchy_and_attaches_the_leaf() {
+        let (_dir, catalog) = open_test_catalog();
+        let conn = catalog.connection();
+        let photo = seed_photo(conn);
+
+        let mut cmd = AddKeywords::new(vec![photo], vec!["Places > France > Paris".into()]);
+        cmd.apply(conn).unwrap();
+
+        assert_eq!(
+            repo::keyword_paths_for_photo(conn, photo).unwrap(),
+            vec!["Places > France > Paris"]
+        );
+
+        // Revert detaches the leaf; the now-unused chain stays in the
+        // keyword table (like Lightroom, keywords aren't garbage-collected).
+        cmd.revert(conn).unwrap();
+        assert!(repo::list_keywords_for_photo(conn, photo).unwrap().is_empty());
+        assert!(repo::find_keyword_by_path(conn, &["Places", "France", "Paris"])
+            .unwrap()
+            .is_some());
+    }
+
+    #[test]
+    fn remove_keywords_matches_by_full_path() {
+        let (_dir, catalog) = open_test_catalog();
+        let conn = catalog.connection();
+        let photo = seed_photo(conn);
+        let mut cmd = AddKeywords::new(
+            vec![photo],
+            vec!["Places > France > Paris".into(), "Paris".into()]
+        );
+        cmd.apply(conn).unwrap();
+
+        // "Paris" alone is a different keyword than "Places > France >
+        // Paris": removing it must leave the hierarchical one attached.
+        let mut cmd = RemoveKeywords::new(vec![photo], vec!["Paris".into()]);
+        cmd.apply(conn).unwrap();
+        assert_eq!(
+            repo::keyword_paths_for_photo(conn, photo).unwrap(),
+            vec!["Places > France > Paris"]
+        );
+
+        let mut cmd = RemoveKeywords::new(vec![photo], vec!["Places > France > Paris".into()]);
+        cmd.apply(conn).unwrap();
+        assert!(repo::keyword_paths_for_photo(conn, photo).unwrap().is_empty());
+    }
+
+    #[test]
+    fn set_iptc_applies_and_reverts_per_photo() {
+        let (_dir, catalog) = open_test_catalog();
+        let conn = catalog.connection();
+        let a = seed_photo(conn);
+        let b = seed_photo_named(conn, "b.jpg");
+        conn.execute(
+            "UPDATE photos SET title = 'Old A' WHERE id = ?1",
+            params![a.get()],
+        )
+        .unwrap();
+
+        let mut cmd = SetIptc::new(vec![a, b], IptcField::Title, Some("New".into()));
+        cmd.apply(conn).unwrap();
+        for id in [a, b] {
+            let title: Option<String> = conn
+                .query_row("SELECT title FROM photos WHERE id = ?1", params![id.get()], |r| {
+                    r.get(0)
+                })
+                .unwrap();
+            assert_eq!(title.as_deref(), Some("New"));
+        }
+
+        // Revert restores what each photo had before, not a blanket value.
+        cmd.revert(conn).unwrap();
+        let title_a: Option<String> = conn
+            .query_row("SELECT title FROM photos WHERE id = ?1", params![a.get()], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        let title_b: Option<String> = conn
+            .query_row("SELECT title FROM photos WHERE id = ?1", params![b.get()], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(title_a.as_deref(), Some("Old A"));
+        assert_eq!(title_b, None);
+    }
+
+    #[test]
+    fn set_iptc_clear_sets_the_field_to_null() {
+        let (_dir, catalog) = open_test_catalog();
+        let conn = catalog.connection();
+        let photo = seed_photo(conn);
+
+        let mut cmd = SetIptc::new(vec![photo], IptcField::Creator, Some("Me".into()));
+        cmd.apply(conn).unwrap();
+        let mut cmd = SetIptc::new(vec![photo], IptcField::Creator, None);
+        cmd.apply(conn).unwrap();
+        let creator: Option<String> = conn
+            .query_row(
+                "SELECT creator FROM photos WHERE id = ?1",
+                params![photo.get()],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(creator, None);
     }
 }

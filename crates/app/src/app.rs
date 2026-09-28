@@ -105,12 +105,13 @@ impl ArchroomApp {
         // only undo stack that exists yet (Develop's is separate, persisted
         // per-photo history, M3 work), so this always targets it; harmless
         // in Develop today since nothing pushes to it from there.
-        let (undo_pressed, redo_pressed) = ctx.input(|i| {
+        let (undo_pressed, redo_pressed, save_pressed) = ctx.input(|i| {
             let cmd = i.modifiers.command;
             let undo = cmd && !i.modifiers.shift && i.key_pressed(egui::Key::Z);
             let redo = (cmd && i.modifiers.shift && i.key_pressed(egui::Key::Z))
                 || (cmd && i.key_pressed(egui::Key::Y));
-            (undo, redo)
+            let save = cmd && i.key_pressed(egui::Key::S);
+            (undo, redo, save)
         });
         if undo_pressed {
             if let Some(Err(e)) = self.cx.undo() {
@@ -119,6 +120,23 @@ impl ArchroomApp {
         } else if redo_pressed {
             if let Some(Err(e)) = self.cx.redo() {
                 error!(error = %e, "redo failed");
+            }
+        } else if save_pressed {
+            // Ctrl+S: write metadata to XMP for the selected photos (or
+            // the active one), as a background job (plan §5.3, §10.3).
+            let ids: Vec<_> = if self.cx.selection.selected_count() > 0 {
+                self.cx.selection.selected().collect()
+            } else {
+                self.cx.selection.active.into_iter().collect()
+            };
+            if !ids.is_empty()
+                && let Some(catalog_path) = self.cx.settings.last_catalog.clone()
+            {
+                self.cx
+                    .jobs
+                    .submit(archroom_services::sidecar::SaveXmpJob::new(
+                        catalog_path, ids,
+                    ));
             }
         }
     }

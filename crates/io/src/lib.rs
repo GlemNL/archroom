@@ -5,6 +5,7 @@ mod libraw;
 mod libraw_spike;
 mod metadata;
 mod types;
+pub mod xmp;
 
 use std::path::Path;
 

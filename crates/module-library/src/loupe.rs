@@ -74,21 +74,38 @@ pub fn show(
     };
 
     let uri = format!("file://{}", preview_path.display());
+    let angle = crate::grid::orientation_angle(photo);
+    let odd_turns = photo.user_orientation % 2 != 0;
     egui::ScrollArea::both()
         .auto_shrink([false, false])
         .show(ui, |ui| match zoom {
             Zoom::Fit => {
                 let available = ui.available_size();
+                // The rotated quad has swapped dimensions, so an odd
+                // quarter turn must lay the un-rotated rect out against
+                // swapped bounds for the result to still fit (plan §6.8's
+                // display-time transform).
+                let max_size = if odd_turns {
+                    egui::Vec2::new(available.y, available.x)
+                } else {
+                    available
+                };
                 ui.centered_and_justified(|ui| {
-                    ui.add(
-                        egui::Image::from_uri(uri.clone())
-                            .max_size(available)
-                            .maintain_aspect_ratio(true),
-                    );
+                    let mut image = egui::Image::from_uri(uri.clone())
+                        .max_size(max_size)
+                        .maintain_aspect_ratio(true);
+                    if angle != 0.0 {
+                        image = image.rotate(angle, egui::Vec2::splat(0.5));
+                    }
+                    ui.add(image);
                 });
             }
             Zoom::OneToOne => {
-                ui.add(egui::Image::from_uri(uri.clone()));
+                let mut image = egui::Image::from_uri(uri.clone());
+                if angle != 0.0 {
+                    image = image.rotate(angle, egui::Vec2::splat(0.5));
+                }
+                ui.add(image);
             }
         });
 }

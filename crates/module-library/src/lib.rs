@@ -9,12 +9,14 @@ mod import_dialog;
 mod left_panel;
 mod loupe;
 mod photos;
+mod right_panel;
 mod shortcuts;
 
 use archroom_services::command::{RotatePhotos, SetFlag};
 use archroom_shell::{AppCx, Module, ModuleId};
 use import_dialog::ImportDialogState;
 use photos::LibraryData;
+use right_panel::RightPanelState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum View {
@@ -29,6 +31,7 @@ pub struct LibraryModule {
     zoom: loupe::Zoom,
     thumbnail_size: f32,
     import_dialog: Option<ImportDialogState>,
+    right_panel: RightPanelState,
 }
 
 impl LibraryModule {
@@ -39,6 +42,7 @@ impl LibraryModule {
             zoom: loupe::Zoom::default(),
             thumbnail_size: 160.0,
             import_dialog: None,
+            right_panel: RightPanelState::default(),
         }
     }
 }
@@ -69,17 +73,7 @@ impl Module for LibraryModule {
     }
 
     fn right_panel(&mut self, ui: &mut egui::Ui, cx: &mut AppCx) {
-        ui.label(format!(
-            "{} of {} selected",
-            cx.selection.selected_count(),
-            self.data.photos.len()
-        ));
-        ui.add_space(8.0);
-        ui.heading("Histogram");
-        ui.add_space(8.0);
-        ui.heading("Metadata");
-        ui.add_space(8.0);
-        ui.heading("Keywording");
+        right_panel::show(ui, cx, &self.data, &mut self.right_panel);
     }
 
     fn toolbar(&mut self, ui: &mut egui::Ui, cx: &mut AppCx) {
@@ -185,7 +179,7 @@ impl Module for LibraryModule {
             });
         } else {
             let ordered = self.data.ordered_ids();
-            shortcuts::handle(ui, cx, &ordered);
+            shortcuts::handle(ui, cx, &ordered, &mut self.right_panel.focus_keyword_entry);
 
             match self.view {
                 View::Grid => {

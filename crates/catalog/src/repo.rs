@@ -4,7 +4,7 @@
 //! connection to the same `.arcat` file (see the M1 plan note on why a
 //! background job doesn't share the UI thread's `Catalog`).
 
-use archroom_core::ids::{FileId, FolderId, ImportId, PhotoId};
+use archroom_core::ids::{FileId, FolderId, ImportId, KeywordId, PhotoId};
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::error::Result;
@@ -351,6 +351,446 @@ pub fn list_folders(conn: &Connection) -> Result<Vec<FolderRow>> {
         .map_err(Into::into)
 }
 
+// ---------------------------------------------------------------------
+// Keywords (plan §7.5): flat CRUD on `keywords` plus the `photo_keywords`
+// join. `photo_fts.keywords` is NOT covered by a trigger — unlike
+// title/caption it has no single source column to watch, so every caller
+// that adds or removes a photo_keywords row must also call
+// `resync_photo_fts_keywords` for the affected photo(s) in the same
+// transaction.
+// ---------------------------------------------------------------------
+
+/// A `keywords` row plus how many photos it's attached to, for the Keyword
+/// List panel (plan §7.5).
+#[derive(Debug, Clone)]
+pub struct KeywordRow {
+    pub id: KeywordId,
+    pub parent_id: Option<KeywordId>,
+    pub name: String,
+    pub include_on_export: bool,
+    pub photo_count: i64,
+}
+
+/// Finds or creates the `keywords` row named `name` under `parent_id`.
+pub fn upsert_keyword(
+    conn: &Connection,
+    parent_id: Option<KeywordId>,
+    name: &str,
+) -> Result<KeywordId> {
+    if let Some(id) = conn
+        .query_row(
+            "SELECT id FROM keywords WHERE parent_id IS ?1 AND name = ?2",
+            params![parent_id.map(KeywordId::get), name],
+            |row| row.get::<_, i64>(0),
+        )
+        .optional()?
+    {
+        return Ok(KeywordId::new(id));
+    }
+    conn.execute(
+        "INSERT INTO keywords (parent_id, name) VALUES (?1, ?2)",
+        params![parent_id.map(KeywordId::get), name],
+    )?;
+    Ok(KeywordId::new(conn.last_insert_rowid()))
+}
+
+pub fn list_keywords(conn: &Connection) -> Result<Vec<KeywordRow>> {
+    let mut stmt = conn.prepare(
+        "SELECT k.id, k.parent_id, k.name, k.include_on_export, count(pk.photo_id)
+         FROM keywords k LEFT JOIN photo_keywords pk ON pk.keyword_id = k.id
+         GROUP BY k.id
+         ORDER BY k.name",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(KeywordRow {
+            id: KeywordId::new(row.get(0)?),
+            parent_id: row.get::<_, Option<i64>>(1)?.map(KeywordId::new),
+            name: row.get(2)?,
+            include_on_export: row.get::<_, i64>(3)? != 0,
+            photo_count: row.get(4)?,
+        })
+    })?;
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(Into::into)
+}
+
+pub fn list_keywords_for_photo(conn: &Connection, photo_id: PhotoId) -> Result<Vec<KeywordId>> {
+    let mut stmt = conn.prepare(
+        "SELECT keyword_id FROM photo_keywords WHERE photo_id = ?1 ORDER BY keyword_id",
+    )?;
+    let rows = stmt.query_map(params![photo_id.get()], |row| {
+        Ok(KeywordId::new(row.get(0)?))
+    })?;
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(Into::into)
+}
+
+pub fn add_photo_keyword(conn: &Connection, photo_id: PhotoId, keyword_id: KeywordId) -> Result<()> {
+    conn.execute(
+        "INSERT OR IGNORE INTO photo_keywords (photo_id, keyword_id) VALUES (?1, ?2)",
+        params![photo_id.get(), keyword_id.get()],
+    )?;
+    resync_photo_fts_keywords(conn, photo_id)
+}
+
+pub fn remove_photo_keyword(
+    conn: &Connection,
+    photo_id: PhotoId,
+    keyword_id: KeywordId,
+) -> Result<()> {
+    conn.execute(
+        "DELETE FROM photo_keywords WHERE photo_id = ?1 AND keyword_id = ?2",
+        params![photo_id.get(), keyword_id.get()],
+    )?;
+    resync_photo_fts_keywords(conn, photo_id)
+}
+
+/// Rebuilds `photo_fts.keywords` for one photo from its current
+/// `photo_keywords` rows. `photo_fts` is a standalone (non-external-content)
+/// FTS5 table, so it must be updated with a delete+insert rather than a
+/// plain `UPDATE`.
+fn resync_photo_fts_keywords(conn: &Connection, photo_id: PhotoId) -> Result<()> {
+    let joined: String = conn.query_row(
+        "SELECT coalesce(group_concat(k.name, ' '), '')
+         FROM photo_keywords pk JOIN keywords k ON k.id = pk.keyword_id
+         WHERE pk.photo_id = ?1",
+        params![photo_id.get()],
+        |row| row.get(0),
+    )?;
+    let (filename, title, caption): (String, Option<String>, Option<String>) = conn.query_row(
+        "SELECT f.filename, p.title, p.caption
+         FROM photos p JOIN files f ON f.id = p.file_id
+         WHERE p.id = ?1",
+        params![photo_id.get()],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+    )?;
+    conn.execute(
+        "DELETE FROM photo_fts WHERE rowid = ?1",
+        params![photo_id.get()],
+    )?;
+    conn.execute(
+        "INSERT INTO photo_fts (rowid, filename, title, caption, keywords) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![photo_id.get(), filename, title, caption, joined],
+    )?;
+    Ok(())
+}
+
+/// The read-only EXIF block the Metadata panel shows for one photo (plan
+/// §7.6): straight out of `files`, in display form. A separate query from
+/// `PhotoSummary` because the Grid never needs lens/exposure/GPS columns
+/// but the panel always does.
+#[derive(Debug, Clone, Default)]
+pub struct PhotoExif {
+    pub filename: String,
+    pub kind: String,
+    pub file_size: Option<i64>,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub capture_time: Option<String>,
+    pub camera_make: Option<String>,
+    pub camera_model: Option<String>,
+    pub lens: Option<String>,
+    pub focal_length: Option<f64>,
+    pub aperture: Option<f64>,
+    pub shutter: Option<f64>,
+    pub iso: Option<i64>,
+    pub gps_lat: Option<f64>,
+    pub gps_lon: Option<f64>,
+}
+
+pub fn photo_exif(conn: &Connection, photo_id: PhotoId) -> Result<PhotoExif> {
+    conn.query_row(
+        "SELECT f.filename, f.kind, f.size, f.width, f.height, f.capture_time,
+                f.camera_make, f.camera_model, f.lens, f.focal_length,
+                f.aperture, f.shutter, f.iso, f.gps_lat, f.gps_lon
+         FROM photos p JOIN files f ON f.id = p.file_id
+         WHERE p.id = ?1",
+        params![photo_id.get()],
+        |row| {
+            Ok(PhotoExif {
+                filename: row.get(0)?,
+                kind: row.get(1)?,
+                file_size: row.get(2)?,
+                width: row.get::<_, Option<i64>>(3)?.map(|v| v as u32),
+                height: row.get::<_, Option<i64>>(4)?.map(|v| v as u32),
+                capture_time: row.get(5)?,
+                camera_make: row.get(6)?,
+                camera_model: row.get(7)?,
+                lens: row.get(8)?,
+                focal_length: row.get(9)?,
+                aperture: row.get(10)?,
+                shutter: row.get(11)?,
+                iso: row.get(12)?,
+                gps_lat: row.get(13)?,
+                gps_lon: row.get(14)?,
+            })
+        },
+    )
+    .map_err(Into::into)
+}
+
+/// The editable IPTC core (plan §7.6): `photos` columns the Metadata panel
+/// writes back through the `SetIptc` command.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PhotoIptc {
+    pub title: Option<String>,
+    pub caption: Option<String>,
+    pub creator: Option<String>,
+    pub copyright: Option<String>,
+}
+
+pub fn photo_iptc(conn: &Connection, photo_id: PhotoId) -> Result<PhotoIptc> {
+    conn.query_row(
+        "SELECT title, caption, creator, copyright FROM photos WHERE id = ?1",
+        params![photo_id.get()],
+        |row| {
+            Ok(PhotoIptc {
+                title: row.get(0)?,
+                caption: row.get(1)?,
+                creator: row.get(2)?,
+                copyright: row.get(3)?,
+            })
+        },
+    )
+    .map_err(Into::into)
+}
+
+/// Every keyword attached to the photo, as its full display path
+/// (`"Places > France"`, plan §7.6) — the flat list the Keywording panel's
+/// chips and the XMP `dc:subject` round-trip both use.
+pub fn keyword_paths_for_photo(conn: &Connection, photo_id: PhotoId) -> Result<Vec<String>> {
+    let ids = list_keywords_for_photo(conn, photo_id)?;
+    let by_id: std::collections::HashMap<KeywordId, (Option<KeywordId>, String)> =
+        list_keywords(conn)?
+            .into_iter()
+            .map(|k| (k.id, (k.parent_id, k.name)))
+            .collect();
+    let mut paths = Vec::with_capacity(ids.len());
+    for id in ids {
+        // Walk up from the keyword; a cycle or a missing parent just
+        // truncates the path (both are impossible through `upsert_keyword`).
+        let mut segments: Vec<String> = Vec::new();
+        let mut cur = Some(id);
+        while let Some(kid) = cur
+            && let Some((parent, name)) = by_id.get(&kid)
+        {
+            segments.push(name.clone());
+            cur = *parent;
+        }
+        if !segments.is_empty() {
+            segments.reverse();
+            paths.push(segments.join(" > "));
+        }
+    }
+    paths.sort();
+    Ok(paths)
+}
+
+/// The `keywords.include_on_export` toggle (plan §7.6's hierarchical
+/// keywords row). Right-click in the Keyword List panel.
+pub fn set_keyword_include_on_export(
+    conn: &Connection,
+    keyword_id: KeywordId,
+    include: bool,
+) -> Result<()> {
+    conn.execute(
+        "UPDATE keywords SET include_on_export = ?2 WHERE id = ?1",
+        params![keyword_id.get(), include],
+    )?;
+    Ok(())
+}
+
+
+/// Everything a sidecar write needs for one photo (plan §5.3's mapping):
+/// the image's path on disk plus the catalog fields `io::xmp` serializes.
+/// `None` when the photo no longer exists.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PhotoXmpSnapshot {
+    pub file_id: FileId,
+    pub image_path: std::path::PathBuf,
+    /// True when another file in the same folder shares the basename
+    /// (a RAW+JPEG pair), so the sidecar must use the full
+    /// `IMG_0001.CR3.xmp` name to avoid colliding (plan D5).
+    pub same_stem_sibling: bool,
+    pub rating: i32,
+    pub flag: i32,
+    pub color_label: Option<String>,
+    pub keywords: Vec<String>,
+    pub title: Option<String>,
+    pub caption: Option<String>,
+    pub creator: Option<String>,
+    pub copyright: Option<String>,
+}
+
+pub fn photo_xmp_snapshot(conn: &Connection, photo_id: PhotoId) -> Result<Option<PhotoXmpSnapshot>> {
+    let Some((file_id, folder_path, filename)) = conn
+        .query_row(
+            "SELECT f.id, fo.path, f.filename
+             FROM photos p JOIN files f ON f.id = p.file_id JOIN folders fo ON fo.id = f.folder_id
+             WHERE p.id = ?1",
+            params![photo_id.get()],
+            |row| {
+                Ok((
+                    FileId::new(row.get::<_, i64>(0)?),
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            },
+        )
+        .optional()?
+    else {
+        return Ok(None);
+    };
+
+    let stem = std::path::Path::new(&filename)
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| filename.clone());
+    let same_stem_sibling: bool = conn.query_row(
+        "SELECT count(*) FROM files
+         WHERE folder_id = (SELECT folder_id FROM files WHERE id = ?1)
+           AND id != ?1
+           AND substr(filename, 1, ?3) = ?2 || '.'",
+        params![file_id.get(), stem, (stem.len() + 1) as i64],
+        |r| r.get::<_, i64>(0),
+    )? > 0;
+
+    let (rating, flag, color_label, title, caption, creator, copyright) = conn.query_row(
+        "SELECT rating, flag, color_label, title, caption, creator, copyright
+         FROM photos WHERE id = ?1",
+        params![photo_id.get()],
+        |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+                row.get(5)?,
+                row.get(6)?,
+            ))
+        },
+    )?;
+
+    // Flat keyword names (dc:subject): every attached keyword's own name,
+    // not its full path — hierarchicalSubject is Later (plan §5.3).
+    let keywords: Vec<String> = {
+        let mut stmt = conn.prepare(
+            "SELECT k.name FROM photo_keywords pk JOIN keywords k ON k.id = pk.keyword_id
+             WHERE pk.photo_id = ?1 ORDER BY k.name",
+        )?;
+        let rows = stmt.query_map(params![photo_id.get()], |row| row.get::<_, String>(0))?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()?
+    };
+
+    Ok(Some(PhotoXmpSnapshot {
+        file_id,
+        image_path: std::path::PathBuf::from(folder_path).join(filename),
+        same_stem_sibling,
+        rating,
+        flag,
+        color_label,
+        keywords,
+        title,
+        caption,
+        creator,
+        copyright,
+    }))
+}
+
+/// Records (or clears) `files.sidecar_mtime`, so folder sync can later spot
+/// a sidecar that changed on disk since the last write (plan §5.3, MVP+).
+pub fn set_sidecar_mtime(conn: &Connection, file_id: FileId, mtime: Option<i64>) -> Result<()> {
+    conn.execute(
+        "UPDATE files SET sidecar_mtime = ?2 WHERE id = ?1",
+        params![file_id.get(), mtime],
+    )?;
+    Ok(())
+}
+
+/// The metadata a sidecar brings to a freshly imported photo (plan §5.3
+/// "existing sidecars are read on import"): rating, flag, label and the
+/// IPTC core in one UPDATE. Keywords go through `upsert_keyword`/
+/// `add_photo_keyword` separately. The `photos` UPDATE fires the existing
+/// FTS trigger, keeping `title`/`caption` searchable.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SidecarMetadata<'a> {
+    pub rating: i32,
+    pub flag: i32,
+    pub color_label: Option<&'a str>,
+    pub title: Option<&'a str>,
+    pub caption: Option<&'a str>,
+    pub creator: Option<&'a str>,
+    pub copyright: Option<&'a str>,
+}
+
+pub fn apply_sidecar_metadata(
+    conn: &Connection,
+    photo_id: PhotoId,
+    m: SidecarMetadata<'_>,
+) -> Result<()> {
+    conn.execute(
+        "UPDATE photos SET rating = ?2, flag = ?3, color_label = ?4,
+                           title = ?5, caption = ?6, creator = ?7, copyright = ?8
+         WHERE id = ?1",
+        params![
+            photo_id.get(),
+            m.rating,
+            m.flag,
+            m.color_label,
+            m.title,
+            m.caption,
+            m.creator,
+            m.copyright,
+        ],
+    )?;
+    Ok(())
+}
+
+/// Resolves a full keyword path (`["Places", "France"]`) to its row id, or
+/// `None` when any segment is missing. The command layer's lookup for
+/// `RemoveKeywords` and the Keyword List panel.
+pub fn find_keyword_by_path(conn: &Connection, path: &[&str]) -> Result<Option<KeywordId>> {
+    let mut current: Option<KeywordId> = None;
+    for segment in path {
+        let found: Option<i64> = conn
+            .query_row(
+                "SELECT id FROM keywords WHERE parent_id IS ?1 AND name = ?2",
+                params![current.map(KeywordId::get), segment],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match found {
+            Some(id) => current = Some(KeywordId::new(id)),
+            None => return Ok(None),
+        }
+    }
+    Ok(current)
+}
+
+/// Finds or creates the whole chain for a keyword path and returns the
+/// leaf's id — `AddKeywords`'s hierarchy support (plan §7.6).
+pub fn upsert_keyword_path(conn: &Connection, path: &[&str]) -> Result<KeywordId> {
+    let mut current: Option<KeywordId> = None;
+    for segment in path {
+        current = Some(upsert_keyword(conn, current, segment)?);
+    }
+    current.ok_or_else(|| {
+        crate::Error::Other("keyword path is empty".into())
+    })
+}
+
+/// Splits a user-typed keyword into path segments: `Places > France >
+/// Paris`, `Places>France`, and `Paris` all work (plan §7.6).
+pub fn split_keyword_path(input: &str) -> Vec<String> {
+    input
+        .split('>')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -576,5 +1016,151 @@ mod tests {
         assert_eq!(parent_row.file_count, 0);
         assert_eq!(child_row.parent_id, Some(parent));
         assert_eq!(child_row.file_count, 1);
+    }
+
+    fn seed_bare_photo(conn: &Connection) -> PhotoId {
+        let folder = upsert_folder_path(conn, std::path::Path::new("/a")).unwrap();
+        let file_id = insert_file(
+            conn,
+            &NewFile {
+                folder_id: folder,
+                filename: "a.jpg",
+                ext: "jpg",
+                kind: "jpeg",
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        insert_photo(
+            conn,
+            &NewPhoto {
+                file_id,
+                import_id: None,
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn upsert_keyword_dedupes_by_parent_and_name() {
+        let (_dir, catalog) = open_test_catalog();
+        let conn = catalog.connection();
+
+        let a = upsert_keyword(conn, None, "Animals").unwrap();
+        let again = upsert_keyword(conn, None, "Animals").unwrap();
+        assert_eq!(a, again);
+
+        let child = upsert_keyword(conn, Some(a), "Dogs").unwrap();
+        assert_ne!(a, child);
+    }
+
+    #[test]
+    fn add_and_remove_photo_keyword_updates_fts_and_counts() {
+        let (_dir, catalog) = open_test_catalog();
+        let conn = catalog.connection();
+        let photo = seed_bare_photo(conn);
+        let kw = upsert_keyword(conn, None, "Sunset").unwrap();
+
+        add_photo_keyword(conn, photo, kw).unwrap();
+        assert_eq!(list_keywords_for_photo(conn, photo).unwrap(), vec![kw]);
+
+        let matched: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM photo_fts WHERE photo_fts MATCH 'Sunset'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(matched, 1);
+
+        let rows = list_keywords(conn).unwrap();
+        assert_eq!(rows.iter().find(|r| r.id == kw).unwrap().photo_count, 1);
+
+        remove_photo_keyword(conn, photo, kw).unwrap();
+        assert!(list_keywords_for_photo(conn, photo).unwrap().is_empty());
+
+        let matched: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM photo_fts WHERE photo_fts MATCH 'Sunset'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(matched, 0);
+    }
+
+    #[test]
+    fn photo_xmp_snapshot_collects_fields_and_detects_stem_siblings() {
+        let (_dir, catalog) = open_test_catalog();
+        let conn = catalog.connection();
+        let folder = upsert_folder_path(conn, std::path::Path::new("/raw+jpg")).unwrap();
+        let raw = insert_file(
+            conn,
+            &NewFile {
+                folder_id: folder,
+                filename: "IMG_0001.CR3",
+                ext: "cr3",
+                kind: "raw",
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        insert_file(
+            conn,
+            &NewFile {
+                folder_id: folder,
+                filename: "IMG_0001.jpg",
+                ext: "jpg",
+                kind: "jpeg",
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let lone = insert_file(
+            conn,
+            &NewFile {
+                folder_id: folder,
+                filename: "solo.jpg",
+                ext: "jpg",
+                kind: "jpeg",
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let raw_photo = insert_photo(conn, &NewPhoto { file_id: raw, import_id: None }).unwrap();
+        let lone_photo = insert_photo(conn, &NewPhoto { file_id: lone, import_id: None }).unwrap();
+
+        conn.execute(
+            "UPDATE photos SET rating = 3, title = 'Sunrise' WHERE id = ?1",
+            params![raw_photo.get()],
+        )
+        .unwrap();
+        let kw = upsert_keyword(conn, None, "Sunrise").unwrap();
+        add_photo_keyword(conn, raw_photo, kw).unwrap();
+
+        let snap = photo_xmp_snapshot(conn, raw_photo).unwrap().unwrap();
+        assert_eq!(snap.image_path, std::path::PathBuf::from("/raw+jpg/IMG_0001.CR3"));
+        assert!(snap.same_stem_sibling, "the RAW+JPEG pair collides on IMG_0001.xmp");
+        assert_eq!(snap.rating, 3);
+        assert_eq!(snap.title.as_deref(), Some("Sunrise"));
+        assert_eq!(snap.keywords, vec!["Sunrise"]);
+
+        let lone_snap = photo_xmp_snapshot(conn, lone_photo).unwrap().unwrap();
+        assert!(!lone_snap.same_stem_sibling);
+
+        // A stem that merely shares a prefix must not count as a sibling.
+        let prefix = insert_file(
+            conn,
+            &NewFile {
+                folder_id: folder,
+                filename: "IMG_00010.jpg",
+                ext: "jpg",
+                kind: "jpeg",
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let prefix_photo = insert_photo(conn, &NewPhoto { file_id: prefix, import_id: None }).unwrap();
+        assert!(!photo_xmp_snapshot(conn, prefix_photo).unwrap().unwrap().same_stem_sibling);
     }
 }

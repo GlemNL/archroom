@@ -116,12 +116,17 @@ fn show_cell(
     match preview_path {
         Some(path) => {
             let uri = format!("file://{}", path.display());
-            ui.put(
-                image_rect,
-                egui::Image::from_uri(uri)
-                    .fit_to_exact_size(Vec2::splat(size))
-                    .maintain_aspect_ratio(true),
-            );
+            let mut image = egui::Image::from_uri(uri)
+                .fit_to_exact_size(Vec2::splat(size))
+                .maintain_aspect_ratio(true);
+            let angle = orientation_angle(photo);
+            if angle != 0.0 {
+                // Display-time quarter turn (plan §6.8): the stored
+                // preview pixels stay un-rotated; only the drawn quad
+                // turns. The square cell keeps the rotated content inside.
+                image = image.rotate(angle, Vec2::splat(0.5));
+            }
+            ui.put(image_rect, image);
         }
         None => {
             painter.rect_filled(image_rect, CornerRadius::same(2), Color32::from_gray(0x2c));
@@ -134,6 +139,7 @@ fn show_cell(
             );
         }
     }
+
 
     // Badges: rating (dots), flag, missing. All read `0`/`None` for every
     // M1 photo today (rating/flag editing is M2) — this just proves the
@@ -231,6 +237,13 @@ pub fn color_label_swatch(label: &str) -> Option<Color32> {
         "Purple" => Some(Color32::from_rgb(0x9c, 0x27, 0xb0)),
         _ => None,
     }
+}
+
+/// The display-time quarter-turn angle (radians, clockwise) for a photo's
+/// user rotation (plan §6.8 / §7.4): `user_orientation` is 0..=3
+/// clockwise quarter turns, stored non-destructively.
+pub fn orientation_angle(photo: &PhotoSummary) -> f32 {
+    photo.user_orientation as f32 * std::f32::consts::FRAC_PI_2
 }
 
 fn truncate_filename(name: &str, max: usize) -> String {

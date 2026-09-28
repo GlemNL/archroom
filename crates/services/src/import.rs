@@ -242,6 +242,15 @@ fn import_one(
         },
     )?;
 
+    // Plan §5.3: an existing sidecar (from Lightroom, darktable, digiKam)
+    // brings its rating, label, IPTC and keywords along on import. Failure
+    // to read it is a warning, not a failed import.
+    if let Err(e) =
+        crate::sidecar::apply_sidecar_on_import(conn, photo_id, file_id, path)
+    {
+        tracing::warn!(path = %path.display(), error = %e, "import: sidecar read failed");
+    }
+
     if let Err(e) =
         crate::preview::generate_and_store(previews, path, photo_id, LEVEL_L1, L1_BUDGET_PX)
     {

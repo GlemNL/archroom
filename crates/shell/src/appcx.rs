@@ -2,10 +2,11 @@ use std::sync::Arc;
 
 use archroom_catalog::Catalog;
 use archroom_catalog::command::Command;
-use archroom_core::events::{CatalogEvent, EventBus};
-use archroom_core::settings::Settings;
+use archroom_core::events::{CatalogEvent, EventBus, PhotoField};
+use archroom_core::settings::{Settings, XmpAutoWrite};
 use archroom_jobs::Scheduler;
 use archroom_services::PreviewCache;
+use archroom_services::sidecar::SaveXmpJob;
 
 use crate::selection::Selection;
 use crate::undo::UndoStack;
@@ -58,7 +59,28 @@ impl AppCx {
             return Ok(());
         };
         let event = self.undo.apply(catalog.connection(), cmd)?;
-        self.events.publish(event);
+        self.events.publish(event.clone());
+
+        // Auto-write (plan §5.3): a metadata change to N photos schedules
+        // N sidecar writes as a background job, never on the UI thread
+        // (plan §4.6). Off by default, like Lightroom (D5).
+        if self.settings.xmp_auto_write == XmpAutoWrite::On
+            && let CatalogEvent::PhotosChanged { ids, fields } = &event
+            && fields.iter().any(|f| {
+                matches!(
+                    f,
+                    PhotoField::Rating
+                        | PhotoField::Flag
+                        | PhotoField::ColorLabel
+                        | PhotoField::Keywords
+                        | PhotoField::Metadata
+                )
+            })
+            && let Some(catalog_path) = self.settings.last_catalog.clone()
+        {
+            self.jobs.submit(SaveXmpJob::new(catalog_path, ids.clone()));
+        }
+
         Ok(())
     }
 

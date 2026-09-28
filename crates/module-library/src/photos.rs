@@ -18,6 +18,10 @@ pub struct LibraryData {
     pub latest_import: Option<archroom_core::ids::ImportId>,
     pub total_photo_count: i64,
     pub sort: PhotoSort,
+    /// Bumped every time a drained `CatalogEvent` was a `PhotosChanged`:
+    /// the right panel's caches (plan §7.6) re-read the catalog only when
+    /// this or the selection moves, never per frame.
+    pub metadata_dirty: u64,
 }
 
 impl LibraryData {
@@ -33,6 +37,11 @@ impl LibraryData {
         let mut needs_refresh = self.last_source != Some(cx.selection.source);
         if let Some(rx) = &self.events_rx {
             while let Ok(ev) = rx.try_recv() {
+                // `PhotosChanged` also bumps `metadata_dirty`: a photo's
+                // rating/keywords/IPTC may have moved under the right
+                // panel's feet (plan §7.6's cached reads).
+                let metadata_changed = matches!(ev, CatalogEvent::PhotosChanged { .. });
+                self.metadata_dirty += u64::from(metadata_changed);
                 needs_refresh |= matches!(
                     ev,
                     CatalogEvent::PhotosAdded { .. }

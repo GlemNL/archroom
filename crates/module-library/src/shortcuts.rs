@@ -1,7 +1,8 @@
-//! Keyboard shortcuts for rating/flag/label/rotate (plan §10.3, "Global"
-//! scope — handled once per frame from Library's `center()`, so it applies
-//! in both Grid and Loupe). Ctrl+Z/Ctrl+Y are handled globally in `app`
-//! instead, since they're meaningful outside Library too in principle.
+//! Keyboard shortcuts for rating/flag/label/rotate plus Ctrl+K for the
+//! Keywording entry (plan §10.3, "Global" scope — handled once per frame
+//! from Library's `center()`, so it applies in both Grid and Loupe).
+//! Ctrl+Z/Ctrl+Y are handled globally in `app` instead, since they're
+//! meaningful outside Library too in principle.
 
 use archroom_core::ids::PhotoId;
 use archroom_services::command::{RotatePhotos, SetColorLabel, SetFlag, SetRating};
@@ -37,11 +38,23 @@ pub fn targets(cx: &AppCx) -> Vec<PhotoId> {
     }
 }
 
-pub fn handle(ui: &egui::Ui, cx: &mut AppCx, ordered: &[PhotoId]) {
+pub fn handle(
+    ui: &egui::Ui,
+    cx: &mut AppCx,
+    ordered: &[PhotoId],
+    focus_keyword_entry: &mut bool,
+) {
     if ui.ctx().wants_keyboard_input() {
         // A text field (Keywording, a search box) has focus — don't steal
         // its digits/letters as rating/flag/label shortcuts.
         return;
+    }
+
+    // Ctrl+K focuses the Keywording entry (plan §10.3): set the flag,
+    // the right panel consumes it and asks egui for the focus (it's
+    // painted before `center()` runs, so the focus lands next frame).
+    if ui.input(|i| i.modifiers.command && i.key_pressed(egui::Key::K)) {
+        *focus_keyword_entry = true;
     }
 
     let (rating_key, label_key, flag_key, rotate, shift) = ui.input(|i| {

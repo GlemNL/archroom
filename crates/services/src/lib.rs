@@ -14,7 +14,7 @@
 mod error;
 pub mod import;
 pub mod preview;
-
+pub mod sidecar;
 pub use error::{Error, Result};
 
 pub use archroom_catalog::{command, repo};
