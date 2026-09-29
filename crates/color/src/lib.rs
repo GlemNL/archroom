@@ -1,6 +1,18 @@
-//! `archroom-color`: color math (matrices, CAT16, Temp/Tint, transfer
-//! functions, the `lcms2` wrapper). The real color science is M3 work (plan
-//! roadmap); M0 only needs the 3x3 matrix type other crates build on.
+//! `archroom-color`: color math (plan §6.4/§6.9): matrices, xy/XYZ, Temp/Tint
+//! (Robertson), CAT16/Bradford chromatic adaptation, OkLab, transfer
+//! functions and the `lcms2` wrapper with a 3D LUT builder.
+//!
+//! The science runs in `f64` (`Mat3d`, `[f64; 3]`) and is narrowed to the
+//! `f32` [`Mat3`] only where it is handed to the GPU or the decoders.
+
+pub mod cat;
+pub mod cie;
+pub mod icc;
+pub mod matrix;
+pub mod oklab;
+pub mod temp;
+
+pub use matrix::Mat3d;
 
 /// A row-major 3x3 matrix over `f32`, used for camera-to-working-space and
 /// chromatic-adaptation transforms.
@@ -52,6 +64,7 @@ pub fn srgb_eotf(encoded: f32) -> f32 {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

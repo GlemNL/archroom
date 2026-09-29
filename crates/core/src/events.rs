@@ -73,6 +73,9 @@ pub enum PhotoField {
     Metadata,
     DevelopSettings,
     Orientation,
+    /// The file vanished from disk (plan §7.4's missing badge, set by the
+    /// M2 missing-file scan job).
+    Missing,
 }
 
 /// Catalog-wide events, published after a `Command` commits (plan §4.5).

@@ -208,14 +208,20 @@ pub struct PhotoSummary {
     pub missing: bool,
     /// Quarter turns applied by the user (0..=3), plan §7.4's non-destructive rotate.
     pub user_orientation: i32,
+    /// Has develop settings (the grid's "edited" badge).
+    pub edited: bool,
+    /// Set on virtual copies ("Copy 1", …).
+    pub copy_name: Option<String>,
 }
 
-const PHOTO_SUMMARY_COLUMNS: &str =
+pub(crate) const PHOTO_SUMMARY_COLUMNS: &str =
     "p.id, f.id, f.folder_id, f.filename, f.kind, f.width, f.height,
      f.orientation, f.capture_time, f.camera_model, p.rating, p.flag, p.color_label, f.missing,
-     p.user_orientation";
+     p.user_orientation,
+     EXISTS(SELECT 1 FROM develop_settings d WHERE d.photo_id = p.id),
+     p.copy_name";
 
-fn photo_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PhotoSummary> {
+pub(crate) fn photo_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PhotoSummary> {
     Ok(PhotoSummary {
         photo_id: PhotoId::new(row.get(0)?),
         file_id: FileId::new(row.get(1)?),
@@ -232,6 +238,8 @@ fn photo_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PhotoSumm
         color_label: row.get(12)?,
         missing: row.get::<_, i64>(13)? != 0,
         user_orientation: row.get(14)?,
+        edited: row.get(15)?,
+        copy_name: row.get(16)?,
     })
 }
 
@@ -247,7 +255,7 @@ pub enum PhotoSort {
 }
 
 impl PhotoSort {
-    fn order_by(self) -> &'static str {
+    pub(crate) fn order_by(self) -> &'static str {
         match self {
             PhotoSort::CaptureTime => "f.capture_time DESC, f.filename ASC",
             PhotoSort::Filename => "f.filename ASC",
@@ -415,9 +423,8 @@ pub fn list_keywords(conn: &Connection) -> Result<Vec<KeywordRow>> {
 }
 
 pub fn list_keywords_for_photo(conn: &Connection, photo_id: PhotoId) -> Result<Vec<KeywordId>> {
-    let mut stmt = conn.prepare(
-        "SELECT keyword_id FROM photo_keywords WHERE photo_id = ?1 ORDER BY keyword_id",
-    )?;
+    let mut stmt = conn
+        .prepare("SELECT keyword_id FROM photo_keywords WHERE photo_id = ?1 ORDER BY keyword_id")?;
     let rows = stmt.query_map(params![photo_id.get()], |row| {
         Ok(KeywordId::new(row.get(0)?))
     })?;
@@ -425,7 +432,11 @@ pub fn list_keywords_for_photo(conn: &Connection, photo_id: PhotoId) -> Result<V
         .map_err(Into::into)
 }
 
-pub fn add_photo_keyword(conn: &Connection, photo_id: PhotoId, keyword_id: KeywordId) -> Result<()> {
+pub fn add_photo_keyword(
+    conn: &Connection,
+    photo_id: PhotoId,
+    keyword_id: KeywordId,
+) -> Result<()> {
     conn.execute(
         "INSERT OR IGNORE INTO photo_keywords (photo_id, keyword_id) VALUES (?1, ?2)",
         params![photo_id.get(), keyword_id.get()],
@@ -600,7 +611,6 @@ pub fn set_keyword_include_on_export(
     Ok(())
 }
 
-
 /// Everything a sidecar write needs for one photo (plan §5.3's mapping):
 /// the image's path on disk plus the catalog fields `io::xmp` serializes.
 /// `None` when the photo no longer exists.
@@ -622,7 +632,10 @@ pub struct PhotoXmpSnapshot {
     pub copyright: Option<String>,
 }
 
-pub fn photo_xmp_snapshot(conn: &Connection, photo_id: PhotoId) -> Result<Option<PhotoXmpSnapshot>> {
+pub fn photo_xmp_snapshot(
+    conn: &Connection,
+    photo_id: PhotoId,
+) -> Result<Option<PhotoXmpSnapshot>> {
     let Some((file_id, folder_path, filename)) = conn
         .query_row(
             "SELECT f.id, fo.path, f.filename
@@ -696,6 +709,39 @@ pub fn photo_xmp_snapshot(conn: &Connection, photo_id: PhotoId) -> Result<Option
         creator,
         copyright,
     }))
+}
+
+/// Where a photo's file lives and how it is oriented — what Develop needs
+/// to open it. `None` when the photo no longer exists.
+#[derive(Debug, Clone)]
+pub struct PhotoFileInfo {
+    pub path: std::path::PathBuf,
+    pub kind: String,
+    /// EXIF orientation tag (1–8) recorded at import.
+    pub exif_orientation: i32,
+    /// The Library's non-destructive quarter turns (0..=3).
+    pub user_orientation: i32,
+}
+
+pub fn photo_file_info(conn: &Connection, photo_id: PhotoId) -> Result<Option<PhotoFileInfo>> {
+    Ok(conn
+        .query_row(
+            "SELECT fo.path, f.filename, f.kind, f.orientation, p.user_orientation
+             FROM photos p JOIN files f ON f.id = p.file_id JOIN folders fo ON fo.id = f.folder_id
+             WHERE p.id = ?1",
+            params![photo_id.get()],
+            |row| {
+                let folder: String = row.get(0)?;
+                let filename: String = row.get(1)?;
+                Ok(PhotoFileInfo {
+                    path: std::path::Path::new(&folder).join(filename),
+                    kind: row.get(2)?,
+                    exif_orientation: row.get::<_, Option<i32>>(3)?.unwrap_or(1),
+                    user_orientation: row.get(4)?,
+                })
+            },
+        )
+        .optional()?)
 }
 
 /// Records (or clears) `files.sidecar_mtime`, so folder sync can later spot
@@ -775,9 +821,7 @@ pub fn upsert_keyword_path(conn: &Connection, path: &[&str]) -> Result<KeywordId
     for segment in path {
         current = Some(upsert_keyword(conn, current, segment)?);
     }
-    current.ok_or_else(|| {
-        crate::Error::Other("keyword path is empty".into())
-    })
+    current.ok_or_else(|| crate::Error::Other("keyword path is empty".into()))
 }
 
 /// Splits a user-typed keyword into path segments: `Places > France >
@@ -1127,8 +1171,22 @@ mod tests {
             },
         )
         .unwrap();
-        let raw_photo = insert_photo(conn, &NewPhoto { file_id: raw, import_id: None }).unwrap();
-        let lone_photo = insert_photo(conn, &NewPhoto { file_id: lone, import_id: None }).unwrap();
+        let raw_photo = insert_photo(
+            conn,
+            &NewPhoto {
+                file_id: raw,
+                import_id: None,
+            },
+        )
+        .unwrap();
+        let lone_photo = insert_photo(
+            conn,
+            &NewPhoto {
+                file_id: lone,
+                import_id: None,
+            },
+        )
+        .unwrap();
 
         conn.execute(
             "UPDATE photos SET rating = 3, title = 'Sunrise' WHERE id = ?1",
@@ -1139,8 +1197,14 @@ mod tests {
         add_photo_keyword(conn, raw_photo, kw).unwrap();
 
         let snap = photo_xmp_snapshot(conn, raw_photo).unwrap().unwrap();
-        assert_eq!(snap.image_path, std::path::PathBuf::from("/raw+jpg/IMG_0001.CR3"));
-        assert!(snap.same_stem_sibling, "the RAW+JPEG pair collides on IMG_0001.xmp");
+        assert_eq!(
+            snap.image_path,
+            std::path::PathBuf::from("/raw+jpg/IMG_0001.CR3")
+        );
+        assert!(
+            snap.same_stem_sibling,
+            "the RAW+JPEG pair collides on IMG_0001.xmp"
+        );
         assert_eq!(snap.rating, 3);
         assert_eq!(snap.title.as_deref(), Some("Sunrise"));
         assert_eq!(snap.keywords, vec!["Sunrise"]);
@@ -1160,7 +1224,19 @@ mod tests {
             },
         )
         .unwrap();
-        let prefix_photo = insert_photo(conn, &NewPhoto { file_id: prefix, import_id: None }).unwrap();
-        assert!(!photo_xmp_snapshot(conn, prefix_photo).unwrap().unwrap().same_stem_sibling);
+        let prefix_photo = insert_photo(
+            conn,
+            &NewPhoto {
+                file_id: prefix,
+                import_id: None,
+            },
+        )
+        .unwrap();
+        assert!(
+            !photo_xmp_snapshot(conn, prefix_photo)
+                .unwrap()
+                .unwrap()
+                .same_stem_sibling
+        );
     }
 }

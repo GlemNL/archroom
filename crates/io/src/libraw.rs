@@ -316,15 +316,19 @@ fn read_camera_color(handle: &LibRawHandle) -> CameraColor {
     let data = unsafe { &*handle.0 };
     let m = data.color.cam_xyz;
     let is_zero = m[0..3].iter().all(|row| row.iter().all(|&v| v == 0.0));
-    let camera_to_xyz_d65 = if is_zero {
+    let xyz_to_camera = if is_zero {
         Mat3::IDENTITY
     } else {
         Mat3([m[0], m[1], m[2]])
     };
     let p = data.color.pre_mul;
+    let c = data.color.cam_mul;
+    let as_shot_mul =
+        (c[0] > 0.0 && c[1] > 0.0 && c[2] > 0.0).then(|| [c[0] / c[1], 1.0, c[2] / c[1]]);
     CameraColor {
-        camera_to_xyz_d65,
-        as_shot_neutral: [p[0], p[1], p[2]],
+        xyz_to_camera,
+        d65_mul: [p[0], p[1], p[2]],
+        as_shot_mul,
     }
 }
 
@@ -374,7 +378,7 @@ mod tests {
         match decoded {
             DecodedImage::SceneLinear { rgb, camera } => {
                 assert_eq!(rgb.width, meta.width);
-                eprintln!("camera matrix: {:?}", camera.camera_to_xyz_d65);
+                eprintln!("camera color: {camera:?}");
             }
             DecodedImage::Rendered { .. } => panic!("a raw must decode to SceneLinear"),
         }

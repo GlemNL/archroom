@@ -41,6 +41,9 @@ impl ArchroomApp {
         let jobs = Arc::new(Scheduler::new(0));
         let job_events = jobs.events();
         let mut cx = AppCx::new(jobs);
+        if let Some(rs) = cc.wgpu_render_state.clone() {
+            cx.set_render_state(rs);
+        }
 
         let catalog_path = cx
             .settings
@@ -71,6 +74,25 @@ impl ArchroomApp {
             Box::new(archroom_module_library::LibraryModule::new()),
             Box::new(archroom_module_develop::DevelopModule::new()),
         ]);
+
+        let mut registry = registry;
+        // Dev/test hook: `ARCHROOM_START_MODULE=develop` opens that module
+        // with the first photo selected, for headless smoke tests.
+        if let Ok(id) = std::env::var("ARCHROOM_START_MODULE") {
+            if let Some(catalog) = &cx.catalog
+                && let Ok(photos) = archroom_services::repo::list_all_photos(
+                    catalog.connection(),
+                    archroom_services::repo::PhotoSort::default(),
+                )
+                && let Some(first) = photos.first()
+            {
+                cx.selection.select_single(first.photo_id);
+            }
+            let target = registry.ids().find(|(m, _)| m.0 == id).map(|(m, _)| m);
+            if let Some(target) = target {
+                registry.switch_to(target, &mut cx);
+            }
+        }
 
         Self {
             cx,
@@ -114,11 +136,13 @@ impl ArchroomApp {
             (undo, redo, save)
         });
         if undo_pressed {
-            if let Some(Err(e)) = self.cx.undo() {
+            if self.registry.active_mut().undo(&mut self.cx) {
+            } else if let Some(Err(e)) = self.cx.undo() {
                 error!(error = %e, "undo failed");
             }
         } else if redo_pressed {
-            if let Some(Err(e)) = self.cx.redo() {
+            if self.registry.active_mut().redo(&mut self.cx) {
+            } else if let Some(Err(e)) = self.cx.redo() {
                 error!(error = %e, "redo failed");
             }
         } else if save_pressed {
@@ -135,7 +159,8 @@ impl ArchroomApp {
                 self.cx
                     .jobs
                     .submit(archroom_services::sidecar::SaveXmpJob::new(
-                        catalog_path, ids,
+                        catalog_path,
+                        ids,
                     ));
             }
         }

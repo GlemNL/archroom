@@ -5,7 +5,9 @@
 //! meaningful outside Library too in principle.
 
 use archroom_core::ids::PhotoId;
-use archroom_services::command::{RotatePhotos, SetColorLabel, SetFlag, SetRating};
+use archroom_services::command::{
+    CreateVirtualCopies, RotatePhotos, SetColorLabel, SetFlag, SetRating,
+};
 use archroom_shell::AppCx;
 
 use crate::grid::color_label_swatch;
@@ -38,14 +40,17 @@ pub fn targets(cx: &AppCx) -> Vec<PhotoId> {
     }
 }
 
-pub fn handle(
-    ui: &egui::Ui,
-    cx: &mut AppCx,
-    ordered: &[PhotoId],
-    focus_keyword_entry: &mut bool,
-) {
-    if ui.ctx().wants_keyboard_input() {
-        // A text field (Keywording, a search box) has focus — don't steal
+/// True only while a `TextEdit` has focus. `Context::wants_keyboard_input`
+/// is true for *any* focused widget, and buttons and grid cells take focus
+/// when clicked — which would silence every shortcut after a single click.
+fn typing_in_text_field(ctx: &egui::Context) -> bool {
+    ctx.memory(|m| m.focused())
+        .is_some_and(|id| egui::TextEdit::load_state(ctx, id).is_some())
+}
+
+pub fn handle(ui: &egui::Ui, cx: &mut AppCx, ordered: &[PhotoId], focus_keyword_entry: &mut bool) {
+    if typing_in_text_field(ui.ctx()) {
+        // A text field (Keywording, the filter bar) has focus — don't steal
         // its digits/letters as rating/flag/label shortcuts.
         return;
     }
@@ -55,6 +60,10 @@ pub fn handle(
     // painted before `center()` runs, so the focus lands next frame).
     if ui.input(|i| i.modifiers.command && i.key_pressed(egui::Key::K)) {
         *focus_keyword_entry = true;
+    }
+
+    if ui.input(|i| !i.modifiers.command && i.key_pressed(egui::Key::B)) {
+        crate::collections_panel::add_to_quick(cx);
     }
 
     let (rating_key, label_key, flag_key, rotate, shift) = ui.input(|i| {
@@ -81,6 +90,12 @@ pub fn handle(
         };
         (rating, label, flag, rotate, i.modifiers.shift)
     });
+
+    // Ctrl+' creates virtual copies (plan §7.4).
+    if ui.input(|i| i.modifiers.command && i.key_pressed(egui::Key::Quote)) {
+        create_virtual_copies(cx);
+        return;
+    }
 
     let ids = targets(cx);
     if ids.is_empty()
@@ -125,6 +140,26 @@ pub fn handle(
     // rating and flag do.
     if applied && shift && (rating_key.is_some() || flag_key.is_some()) {
         cx.selection.advance(ordered, 1);
+    }
+}
+
+/// Makes a virtual copy of each targeted photo and selects the copies.
+pub fn create_virtual_copies(cx: &mut AppCx) {
+    let ids = targets(cx);
+    if ids.is_empty() {
+        return;
+    }
+    match cx.apply_command_event(Box::new(CreateVirtualCopies::new(ids))) {
+        Ok(Some(archroom_core::events::CatalogEvent::PhotosAdded { ids, .. })) => {
+            if let Some((first, rest)) = ids.split_first() {
+                cx.selection.select_single(*first);
+                for id in rest {
+                    cx.selection.toggle(*id);
+                }
+            }
+        }
+        Ok(_) => {}
+        Err(e) => tracing::error!(error = %e, "failed to create virtual copies"),
     }
 }
 

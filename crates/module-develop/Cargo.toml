@@ -12,7 +12,9 @@ workspace = true
 archroom-core = { workspace = true }
 archroom-shell = { workspace = true }
 archroom-ui = { workspace = true }
+archroom-services = { workspace = true }
+crossbeam-channel = { workspace = true }
 egui = "0.33"
+egui-wgpu = "0.33"
+rfd = "0.15"
 tracing = { workspace = true }
-
-# archroom-services joins once Develop has a canvas to render into (M3).

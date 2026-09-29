@@ -170,8 +170,21 @@ CREATE TABLE schema_meta (
 INSERT INTO schema_meta(key, value) VALUES ('created_by', 'archroom');
 "#;
 
+/// Develop presets (plan §8.1): a named set of settings groups plus the
+/// params they take from.
+const V2: &str = r#"
+CREATE TABLE presets (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  folder TEXT NOT NULL DEFAULT 'User Presets',
+  groups TEXT NOT NULL,
+  params TEXT NOT NULL,
+  created_at TEXT
+);
+"#;
+
 pub fn migrations() -> Migrations<'static> {
-    Migrations::new(vec![M::up(V1)])
+    Migrations::new(vec![M::up(V1), M::up(V2)])
 }
 
 #[cfg(test)]

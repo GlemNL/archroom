@@ -3,7 +3,9 @@
 //! catalog; Organize (ratings/flags/keywords/collections/filter bar) is
 //! M2.
 
+mod collections_panel;
 mod filmstrip;
+mod filter_bar;
 mod grid;
 mod import_dialog;
 mod left_panel;
@@ -32,6 +34,7 @@ pub struct LibraryModule {
     thumbnail_size: f32,
     import_dialog: Option<ImportDialogState>,
     right_panel: RightPanelState,
+    collections_ui: collections_panel::CollectionsUi,
 }
 
 impl LibraryModule {
@@ -43,6 +46,7 @@ impl LibraryModule {
             thumbnail_size: 160.0,
             import_dialog: None,
             right_panel: RightPanelState::default(),
+            collections_ui: collections_panel::CollectionsUi::default(),
         }
     }
 }
@@ -68,6 +72,8 @@ impl Module for LibraryModule {
         self.data.sync(cx);
 
         left_panel::catalog_panel(ui, cx, &self.data);
+        ui.add_space(12.0);
+        collections_panel::panel(ui, cx, &mut self.data, &mut self.collections_ui);
         ui.add_space(12.0);
         left_panel::folders_panel(ui, cx, &mut self.data);
     }
@@ -123,6 +129,13 @@ impl Module for LibraryModule {
             }
             shortcuts::label_picker(ui, cx);
             if ui
+                .button("⧉")
+                .on_hover_text("Create virtual copy (Ctrl+')")
+                .clicked()
+            {
+                shortcuts::create_virtual_copies(cx);
+            }
+            if ui
                 .button("⟲")
                 .on_hover_text("Rotate left (Ctrl+[)")
                 .clicked()
@@ -173,9 +186,17 @@ impl Module for LibraryModule {
             return;
         }
 
+        filter_bar::show(ui, &mut self.data.filter, self.data.photos.len());
+        ui.separator();
+
         if self.data.photos.is_empty() {
+            let msg = if self.data.filter.is_active() {
+                "No photos match the filter."
+            } else {
+                "No photos yet — import to get started."
+            };
             ui.centered_and_justified(|ui| {
-                ui.label("No photos yet — import to get started.");
+                ui.label(msg);
             });
         } else {
             let ordered = self.data.ordered_ids();

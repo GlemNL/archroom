@@ -196,7 +196,11 @@ pub fn read_sidecar(path: &Path) -> Result<SidecarData> {
     let keywords = meta
         .get_tag_multiple_strings("Xmp.dc.subject")
         .unwrap_or_default();
-    let title = non_empty(meta.get_tag_string("Xmp.dc.title").ok().map(|s| strip_lang_alt_prefix(&s)));
+    let title = non_empty(
+        meta.get_tag_string("Xmp.dc.title")
+            .ok()
+            .map(|s| strip_lang_alt_prefix(&s)),
+    );
     let caption = non_empty(
         meta.get_tag_string("Xmp.dc.description")
             .ok()
@@ -281,7 +285,10 @@ mod tests {
         assert_eq!(back.rating, Some(4));
         assert_eq!(back.flag, Some(1));
         assert_eq!(back.color_label, Some("Red".to_string()));
-        assert_eq!(back.keywords, vec!["Sunset".to_string(), "Beach".to_string()]);
+        assert_eq!(
+            back.keywords,
+            vec!["Sunset".to_string(), "Beach".to_string()]
+        );
         assert_eq!(back.title, Some("A title".to_string()));
         assert_eq!(back.caption, Some("A caption".to_string()));
         assert_eq!(back.creator, Some("A. Photographer".to_string()));
@@ -333,7 +340,10 @@ mod tests {
         .unwrap();
 
         let meta = rexiv2::Metadata::new_from_path(&path).unwrap();
-        assert_eq!(meta.get_tag_string("Xmp.dc.format").unwrap(), "image/x-canon-cr3");
+        assert_eq!(
+            meta.get_tag_string("Xmp.dc.format").unwrap(),
+            "image/x-canon-cr3"
+        );
     }
 
     /// Cross-checks against the real `exiv2` CLI (an independent parser, as
@@ -342,7 +352,10 @@ mod tests {
     /// hide a wire-format mistake. Skips if `exiv2` isn't on PATH.
     #[test]
     fn round_trip_is_readable_by_the_exiv2_cli() {
-        let Ok(output) = std::process::Command::new("exiv2").arg("--version").output() else {
+        let Ok(output) = std::process::Command::new("exiv2")
+            .arg("--version")
+            .output()
+        else {
             eprintln!("skipping: exiv2 CLI not found");
             return;
         };

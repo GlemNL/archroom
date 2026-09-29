@@ -5,9 +5,12 @@
 use std::collections::BTreeSet;
 
 use archroom_core::events::CatalogEvent;
+use archroom_services::collections::{self, CollectionRow, PhotoSource};
 use archroom_services::repo::{self, FolderRow, PhotoSort, PhotoSummary};
 use archroom_shell::{AppCx, LibrarySource};
 use crossbeam_channel::Receiver;
+
+use crate::filter_bar::FilterState;
 
 #[derive(Debug, Default)]
 pub struct LibraryData {
@@ -15,6 +18,9 @@ pub struct LibraryData {
     last_source: Option<LibrarySource>,
     pub photos: Vec<PhotoSummary>,
     pub folders: Vec<FolderRow>,
+    pub collections: Vec<CollectionRow>,
+    pub filter: FilterState,
+    last_filter: Option<FilterState>,
     pub latest_import: Option<archroom_core::ids::ImportId>,
     pub total_photo_count: i64,
     pub sort: PhotoSort,
@@ -34,7 +40,8 @@ impl LibraryData {
             self.events_rx = Some(cx.events.subscribe());
         }
 
-        let mut needs_refresh = self.last_source != Some(cx.selection.source);
+        let mut needs_refresh = self.last_source != Some(cx.selection.source)
+            || self.last_filter.as_ref() != Some(&self.filter);
         if let Some(rx) = &self.events_rx {
             while let Ok(ev) = rx.try_recv() {
                 // `PhotosChanged` also bumps `metadata_dirty`: a photo's
@@ -48,6 +55,7 @@ impl LibraryData {
                         | CatalogEvent::PhotosRemoved { .. }
                         | CatalogEvent::PhotosChanged { .. }
                         | CatalogEvent::ImportFinished { .. }
+                        | CatalogEvent::CollectionsChanged { .. }
                 );
             }
         }
@@ -55,6 +63,7 @@ impl LibraryData {
         if needs_refresh {
             self.refresh(cx);
             self.last_source = Some(cx.selection.source);
+            self.last_filter = Some(self.filter.clone());
         }
     }
 
@@ -62,15 +71,18 @@ impl LibraryData {
         let Some(catalog) = &cx.catalog else {
             self.photos.clear();
             self.folders.clear();
+            self.collections.clear();
             return;
         };
         let conn = catalog.connection();
 
-        let photos = match cx.selection.source {
-            LibrarySource::AllPhotographs => repo::list_all_photos(conn, self.sort),
-            LibrarySource::Folder(id) => repo::list_photos_for_folder(conn, id, self.sort),
-            LibrarySource::Import(id) => repo::list_photos_for_import(conn, id, self.sort),
+        let source = match cx.selection.source {
+            LibrarySource::AllPhotographs => PhotoSource::All,
+            LibrarySource::Folder(id) => PhotoSource::Folder(id),
+            LibrarySource::Import(id) => PhotoSource::Import(id),
+            LibrarySource::Collection(id) => PhotoSource::Collection(id),
         };
+        let photos = collections::list_photos(conn, &source, &self.filter.rules(), true, self.sort);
         match photos {
             Ok(photos) => self.photos = photos,
             Err(e) => {
@@ -84,10 +96,16 @@ impl LibraryData {
             Err(e) => tracing::error!(error = %e, "failed to list folders"),
         }
 
+        match collections::list_collections(conn) {
+            Ok(rows) => self.collections = rows,
+            Err(e) => tracing::error!(error = %e, "failed to list collections"),
+        }
+
         self.latest_import = repo::latest_import_id(conn).unwrap_or_default();
         self.total_photo_count = repo::count_all_photos(conn).unwrap_or_default();
 
         let still_present: BTreeSet<_> = self.photos.iter().map(|p| p.photo_id).collect();
+        cx.selection.visible = self.photos.iter().map(|p| p.photo_id).collect();
         cx.selection.retain(&still_present);
     }
 

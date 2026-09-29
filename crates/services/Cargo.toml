@@ -13,10 +13,14 @@ archroom-core = { workspace = true }
 archroom-catalog = { workspace = true }
 archroom-io = { workspace = true }
 archroom-engine = { workspace = true }
+archroom-color = { workspace = true }
+crossbeam-channel = { workspace = true }
 archroom-preview = { workspace = true }
 archroom-jobs = { workspace = true }
 rusqlite = { workspace = true }
 thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 tracing = { workspace = true }
 walkdir = "2"
 trash = "5"

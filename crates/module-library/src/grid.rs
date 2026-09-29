@@ -140,7 +140,6 @@ fn show_cell(
         }
     }
 
-
     // Badges: rating (dots), flag, missing. All read `0`/`None` for every
     // M1 photo today (rating/flag editing is M2) — this just proves the
     // rendering doesn't need to change once M2 starts writing them.
@@ -197,6 +196,28 @@ fn show_cell(
             egui::pos2(rect.min.x + CELL_PADDING, badge_y),
             egui::Align2::LEFT_TOP,
             "⟳",
+            egui::FontId::proportional(13.0),
+            Color32::from_gray(0xd0),
+        );
+    }
+
+    if let Some(name) = &photo.copy_name {
+        painter.text(
+            egui::pos2(
+                rect.min.x + CELL_PADDING,
+                rect.max.y - LABEL_HEIGHT - CELL_PADDING - 14.0,
+            ),
+            egui::Align2::LEFT_BOTTOM,
+            format!("⧉ {name}"),
+            egui::FontId::proportional(10.0),
+            Color32::from_gray(0xd0),
+        );
+    }
+    if photo.edited {
+        painter.text(
+            egui::pos2(rect.max.x - CELL_PADDING, rect.min.y + CELL_PADDING + 16.0),
+            egui::Align2::RIGHT_TOP,
+            "✎",
             egui::FontId::proportional(13.0),
             Color32::from_gray(0xd0),
         );

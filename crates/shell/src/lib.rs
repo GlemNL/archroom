@@ -12,7 +12,7 @@ mod registry;
 mod selection;
 mod undo;
 
-pub use appcx::AppCx;
+pub use appcx::{AppCx, RenderStateHandle};
 pub use module::{Action, Module, ModuleId};
 pub use registry::ModuleRegistry;
 pub use selection::{LibrarySource, Selection};

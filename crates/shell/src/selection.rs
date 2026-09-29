@@ -5,7 +5,7 @@
 
 use std::collections::BTreeSet;
 
-use archroom_core::ids::{FolderId, ImportId, PhotoId};
+use archroom_core::ids::{CollectionId, FolderId, ImportId, PhotoId};
 
 /// What the Grid/filmstrip are currently listing (plan §7.2's Catalog and
 /// Folders panels). Collections join once M2 builds them.
@@ -15,12 +15,16 @@ pub enum LibrarySource {
     AllPhotographs,
     Folder(FolderId),
     Import(ImportId),
+    Collection(CollectionId),
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct Selection {
     pub source: LibrarySource,
     pub active: Option<PhotoId>,
+    /// The photos the Grid currently lists, in order — set by Library so
+    /// Develop can step to the next/previous photo.
+    pub visible: Vec<PhotoId>,
     selected: BTreeSet<PhotoId>,
 }
 

@@ -11,11 +11,22 @@ use archroom_services::sidecar::SaveXmpJob;
 use crate::selection::Selection;
 use crate::undo::UndoStack;
 
+/// `egui_wgpu::RenderState` with a `Debug` impl so `AppCx` can derive it.
+#[derive(Clone)]
+pub struct RenderStateHandle(pub egui_wgpu::RenderState);
+
+impl std::fmt::Debug for RenderStateHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("RenderState")
+    }
+}
+
 /// Shared state and services passed to every `Module` method (plan §4.5).
 /// Modules never call each other directly — only through `AppCx` and the
 /// event bus.
 ///
-/// `engine` joins once Develop (M3) needs it.
+/// The GPU is `None` when the app runs without a wgpu backend; Develop then
+/// shows a message instead of a canvas.
 #[derive(Debug)]
 pub struct AppCx {
     pub catalog: Option<Catalog>,
@@ -31,6 +42,10 @@ pub struct AppCx {
     /// [`AppCx::apply_command`]/[`AppCx::undo`]/[`AppCx::redo`] over using
     /// this directly — they also publish the resulting `CatalogEvent`.
     pub undo: UndoStack,
+    /// The device egui draws with, shared with the engine (plan D1).
+    pub gpu: Option<archroom_services::engine::gpu::GpuContext>,
+    /// For registering engine textures with egui.
+    pub render_state: Option<RenderStateHandle>,
 }
 
 impl AppCx {
@@ -43,7 +58,20 @@ impl AppCx {
             settings: Settings::load().unwrap_or_default(),
             selection: Selection::default(),
             undo: UndoStack::default(),
+            gpu: None,
+            render_state: None,
         }
+    }
+
+    /// Hands over egui's wgpu device so modules can render with the engine.
+    pub fn set_render_state(&mut self, rs: egui_wgpu::RenderState) {
+        let name = rs.adapter.get_info().name;
+        self.gpu = Some(archroom_services::engine::gpu::GpuContext::from_parts(
+            rs.device.clone(),
+            rs.queue.clone(),
+            &name,
+        ));
+        self.render_state = Some(RenderStateHandle(rs));
     }
 
     pub fn catalog_open(&self) -> bool {
@@ -55,8 +83,18 @@ impl AppCx {
     /// path every mutation should go through (plan §4.5). A no-op if no
     /// catalog is open.
     pub fn apply_command(&mut self, cmd: Box<dyn Command>) -> archroom_catalog::Result<()> {
+        self.apply_command_event(cmd).map(|_| ())
+    }
+
+    /// Like [`AppCx::apply_command`], but also returns the event the command
+    /// produced (e.g. the ids `CreateVirtualCopies` made). `None` when no
+    /// catalog is open.
+    pub fn apply_command_event(
+        &mut self,
+        cmd: Box<dyn Command>,
+    ) -> archroom_catalog::Result<Option<CatalogEvent>> {
         let Some(catalog) = &self.catalog else {
-            return Ok(());
+            return Ok(None);
         };
         let event = self.undo.apply(catalog.connection(), cmd)?;
         self.events.publish(event.clone());
@@ -81,7 +119,7 @@ impl AppCx {
             self.jobs.submit(SaveXmpJob::new(catalog_path, ids.clone()));
         }
 
-        Ok(())
+        Ok(Some(event))
     }
 
     pub fn undo(&mut self) -> Option<archroom_catalog::Result<()>> {

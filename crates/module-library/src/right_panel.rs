@@ -160,8 +160,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut AppCx, data: &LibraryData, state: &mut R
     // Ctrl+K was pressed in `center()` — focus the Keywording entry.
     if state.focus_keyword_entry {
         state.focus_keyword_entry = false;
-        ui.ctx()
-            .memory_mut(|m| m.request_focus(keyword_entry_id()));
+        ui.ctx().memory_mut(|m| m.request_focus(keyword_entry_id()));
     }
 
     if !cx.catalog_open() {
@@ -420,7 +419,14 @@ fn metadata_panel(ui: &mut egui::Ui, cx: &mut AppCx, state: &mut RightPanelState
         .show(ui, |ui| {
             for (i, field) in IPTC_FIELDS.iter().enumerate() {
                 ui.weak(field.label());
-                iptc_field(ui, cx, *field, &cache.iptc[i], &mut state.iptc[i], &cache.targets);
+                iptc_field(
+                    ui,
+                    cx,
+                    *field,
+                    &cache.iptc[i],
+                    &mut state.iptc[i],
+                    &cache.targets,
+                );
                 ui.end_row();
             }
         });
@@ -730,7 +736,9 @@ fn keyword_row(
         if ui.button(label).clicked() {
             let Some(catalog) = &cx.catalog else { return };
             let include = !node.row.include_on_export;
-            if let Err(e) = repo::set_keyword_include_on_export(catalog.connection(), node.row.id, include) {
+            if let Err(e) =
+                repo::set_keyword_include_on_export(catalog.connection(), node.row.id, include)
+            {
                 tracing::error!(error = %e, "failed to set include_on_export");
             } else {
                 *version_bump = true;

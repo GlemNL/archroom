@@ -16,6 +16,8 @@ pub struct LrSlider<'a> {
     decimals: usize,
     suffix: &'a str,
     label_width: f32,
+    formatter: Option<fn(f32) -> String>,
+    parser: Option<fn(&str) -> Option<f32>>,
 }
 
 impl<'a> LrSlider<'a> {
@@ -32,6 +34,8 @@ impl<'a> LrSlider<'a> {
             decimals: 2,
             suffix: "",
             label_width: 90.0,
+            formatter: None,
+            parser: None,
         }
     }
 
@@ -60,6 +64,15 @@ impl<'a> LrSlider<'a> {
         self.label_width = width;
         self
     }
+
+    /// Shows the value through `format` and reads typed text through
+    /// `parse`, for sliders whose track isn't the displayed unit (Temp is
+    /// linear in mireds but reads in kelvin).
+    pub fn display(mut self, format: fn(f32) -> String, parse: fn(&str) -> Option<f32>) -> Self {
+        self.formatter = Some(format);
+        self.parser = Some(parse);
+        self
+    }
 }
 
 impl Widget for LrSlider<'_> {
@@ -74,6 +87,8 @@ impl Widget for LrSlider<'_> {
             decimals,
             suffix,
             label_width,
+            formatter,
+            parser,
         } = self;
 
         ui.horizontal(|ui| {
@@ -101,14 +116,18 @@ impl Widget for LrSlider<'_> {
                 }
             }
 
-            let text = format!("{value:.decimals$}{suffix}");
-            ui.add_sized(
-                [56.0, ui.spacing().interact_size.y],
-                egui::DragValue::new(value)
-                    .range(range)
-                    .custom_formatter(move |_, _| text.clone())
-                    .speed(fine_step),
-            );
+            let text = match formatter {
+                Some(f) => f(*value),
+                None => format!("{value:.decimals$}{suffix}"),
+            };
+            let mut drag = egui::DragValue::new(value)
+                .range(range)
+                .custom_formatter(move |_, _| text.clone())
+                .speed(fine_step);
+            if let Some(parse) = parser {
+                drag = drag.custom_parser(move |s| parse(s).map(f64::from));
+            }
+            ui.add_sized([56.0, ui.spacing().interact_size.y], drag);
 
             label_response | drag_response
         })

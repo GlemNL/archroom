@@ -76,9 +76,18 @@ impl PreviewCache {
         width: u32,
         height: u32,
     ) -> Result<PathBuf> {
-        let filename = format!("{}_{level}.jpg", photo_id.get());
+        // The params hash is part of the name so an edited preview has a new
+        // URI: image loaders cache by URI and would otherwise keep showing
+        // the stale file.
+        let filename = format!("{}_{level}_{:016x}.jpg", photo_id.get(), params_hash as u64);
         let path = self.dir.join(&filename);
+        let previous = self.lookup(photo_id, level)?;
         std::fs::write(&path, jpeg_bytes).map_err(|e| Error::io(&path, e))?;
+        if let Some(old) = previous
+            && old != path
+        {
+            let _ = std::fs::remove_file(old);
+        }
 
         self.conn.execute(
             "INSERT INTO previews (photo_id, level, params_hash, filename, width, height)

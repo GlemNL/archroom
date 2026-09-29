@@ -36,11 +36,9 @@ fixtures:
     @exit 1
 
 # Re-bless golden-image references after an intentional rendering change
-# (plan §13). TODO(M3): wired up once `archroom-cli render` and the golden
-# suite exist.
+# (plan §13): rewrites tests/golden/*.png; review the diff before committing.
 bless:
-    @echo "TODO(M3): golden-image bless — plan §13"
-    @exit 1
+    ARCHROOM_BLESS=1 cargo test -p archroom-engine --test golden
 
 # Everything CI runs.
 ci: lint test

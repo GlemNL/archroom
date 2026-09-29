@@ -146,7 +146,11 @@ impl SaveXmpJob {
 
 impl Job for SaveXmpJob {
     fn label(&self) -> String {
-        format!("Saving metadata to XMP ({} photo{})", self.photo_ids.len(), if self.photo_ids.len() == 1 { "" } else { "s" })
+        format!(
+            "Saving metadata to XMP ({} photo{})",
+            self.photo_ids.len(),
+            if self.photo_ids.len() == 1 { "" } else { "s" }
+        )
     }
 
     fn priority(&self) -> Priority {
@@ -237,7 +241,10 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert!(mtime.is_some(), "the write must be recorded for folder sync");
+        assert!(
+            mtime.is_some(),
+            "the write must be recorded for folder sync"
+        );
     }
 
     #[test]
@@ -300,12 +307,14 @@ mod tests {
         let catalog = open_catalog(dir.path());
         let (photo, file) = seed_photo_in(&catalog, dir.path(), "img.jpg");
 
-        assert!(!apply_sidecar_on_import(
-            catalog.connection(),
-            photo,
-            file,
-            &dir.path().join("img.jpg"),
-        )
-        .unwrap());
+        assert!(
+            !apply_sidecar_on_import(
+                catalog.connection(),
+                photo,
+                file,
+                &dir.path().join("img.jpg"),
+            )
+            .unwrap()
+        );
     }
 }

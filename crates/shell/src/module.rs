@@ -29,6 +29,15 @@ pub trait Module {
     /// a no-op until a module has photos to show a strip of.
     fn filmstrip(&mut self, _ui: &mut egui::Ui, _cx: &mut AppCx) {}
 
+    /// Ctrl+Z / Ctrl+Y: a module with its own history (Develop) handles it
+    /// and returns true; otherwise the app falls back to the shared stack.
+    fn undo(&mut self, _cx: &mut AppCx) -> bool {
+        false
+    }
+    fn redo(&mut self, _cx: &mut AppCx) -> bool {
+        false
+    }
+
     fn handle_action(&mut self, _action: Action, _cx: &mut AppCx) -> bool {
         false
     }

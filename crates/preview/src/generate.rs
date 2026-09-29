@@ -51,6 +51,20 @@ pub fn generate_preview_from_display_rgb(
     resize_and_encode_jpeg(&rgb_f32_to_image(rgb, |v| v.clamp(0.0, 1.0)), budget_px)
 }
 
+/// JPEG-encodes tightly packed display-referred RGBA8 (the develop
+/// pipeline's output, already at the preview's size).
+pub fn encode_jpeg_from_rgba8(rgba: &[u8], width: u32, height: u32) -> Result<Vec<u8>> {
+    let mut rgb = Vec::with_capacity((width * height * 3) as usize);
+    for px in rgba.chunks_exact(4) {
+        rgb.extend_from_slice(&px[..3]);
+    }
+    let mut out = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY)
+        .write_image(&rgb, width, height, ExtendedColorType::Rgb8)
+        .map_err(|e| Error::Other(format!("jpeg encode: {e}")))?;
+    Ok(out)
+}
+
 fn rgb_f32_to_image(rgb: &ImageF32, tone: impl Fn(f32) -> f32) -> DynamicImage {
     let mut buf = image::RgbImage::new(rgb.width, rgb.height);
     let channels = rgb.channels as usize;

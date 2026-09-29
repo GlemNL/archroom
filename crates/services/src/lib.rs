@@ -11,13 +11,19 @@
 //! inherent methods on a value it's handed) is re-exported here instead of
 //! read straight off `archroom_catalog`/`archroom_preview`/`archroom_jobs`.
 
+pub mod develop;
 mod error;
 pub mod import;
+pub mod presets;
 pub mod preview;
+pub mod rerender;
+pub mod session;
 pub mod sidecar;
 pub use error::{Error, Result};
 
-pub use archroom_catalog::{command, repo};
+pub use archroom_catalog::develop as catalog_develop;
+pub use archroom_catalog::{collections, command, criteria, repo};
+pub use archroom_engine as engine;
 pub use archroom_jobs::JobHandle;
 pub use archroom_preview::{
     DEFAULT_PARAMS_HASH, L1_BUDGET_PX, L2_BUDGET_PX, LEVEL_L1, LEVEL_L2, PreviewCache,

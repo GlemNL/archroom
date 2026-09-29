@@ -12,12 +12,20 @@ pub struct ImageF32 {
 }
 
 /// The camera color model needed to map raw camera RGB to a working space
-/// (plan §6.3/§6.4): the DNG-style D65 color matrix and the as-shot white
-/// balance multipliers it was built relative to.
+/// (plan §6.3/§6.4).
+/// - `xyz_to_camera` is LibRaw's `cam_xyz`: the DNG-style *XYZ → camera*
+///   ColorMatrix (invert it to go camera → XYZ).
+/// - `d65_mul` is LibRaw's `pre_mul`, the D65-reference multipliers applied
+///   to the raw data before demosaicing: a decoded pixel is
+///   `raw_camera_rgb * d65_mul`.
+/// - `as_shot_mul` is LibRaw's `cam_mul` (G-normalized): the multipliers
+///   that would neutralise the illuminant the camera recorded, or `None` if
+///   the file carries no as-shot white balance.
 #[derive(Debug, Clone)]
 pub struct CameraColor {
-    pub camera_to_xyz_d65: Mat3,
-    pub as_shot_neutral: [f32; 3],
+    pub xyz_to_camera: Mat3,
+    pub d65_mul: [f32; 3],
+    pub as_shot_mul: Option<[f32; 3]>,
 }
 
 #[derive(Debug, Clone)]
