@@ -27,14 +27,30 @@ pub fn generate_and_store(
     let decoder = decoder_for(path)
         .ok_or_else(|| Error::Other(format!("no decoder for {}", path.display())))?;
 
+    // Neither the embedded thumbnails nor the decoders rotate, so turn the
+    // pixels upright here, the way Develop does (EXIF, then user turns on top).
+    let meta = decoder.metadata(path)?;
     let (jpeg, w, h) = match decoder.embedded_preview(path)? {
-        Some(bytes) => generate_preview_from_jpeg_bytes(&bytes, budget_px)?,
+        Some(bytes) => {
+            // Some cameras embed a thumbnail that is already upright; then
+            // its aspect no longer matches the sensor's and it needs no turn.
+            let mut orientation = meta.orientation;
+            if matches!(orientation, 5..=8)
+                && let Ok(size) = image::ImageReader::new(std::io::Cursor::new(&bytes))
+                    .with_guessed_format()
+                    .and_then(|r| r.into_dimensions().map_err(std::io::Error::other))
+                && (size.0 >= size.1) != (meta.width >= meta.height)
+            {
+                orientation = 1;
+            }
+            generate_preview_from_jpeg_bytes(&bytes, budget_px, orientation)?
+        }
         None => match decoder.decode(path, &DecodeOptions::default())? {
             DecodedImage::SceneLinear { rgb, .. } => {
-                generate_preview_from_linear_rgb(&rgb, budget_px)?
+                generate_preview_from_linear_rgb(&rgb, budget_px, meta.orientation)?
             }
             DecodedImage::Rendered { rgb, .. } => {
-                generate_preview_from_display_rgb(&rgb, budget_px)?
+                generate_preview_from_display_rgb(&rgb, budget_px, meta.orientation)?
             }
         },
     };

@@ -43,10 +43,11 @@ pub fn set_preview_options(long_edge: u32, jpeg_quality: u8) {
 pub fn generate_preview_from_jpeg_bytes(
     jpeg_bytes: &[u8],
     budget_px: u32,
+    orientation: i32,
 ) -> Result<(Vec<u8>, u32, u32)> {
     let src = image::load_from_memory(jpeg_bytes)
         .map_err(|e| Error::Other(format!("decode embedded thumbnail: {e}")))?;
-    resize_and_encode_jpeg(&src, budget_px)
+    resize_and_encode_jpeg(&src, budget_px, orientation)
 }
 
 /// Builds a preview straight from decoded scene-linear pixels (the fallback
@@ -55,10 +56,12 @@ pub fn generate_preview_from_jpeg_bytes(
 pub fn generate_preview_from_linear_rgb(
     rgb: &ImageF32,
     budget_px: u32,
+    orientation: i32,
 ) -> Result<(Vec<u8>, u32, u32)> {
     resize_and_encode_jpeg(
         &rgb_f32_to_image(rgb, |v| v.clamp(0.0, 1.0).powf(1.0 / 2.2)),
         budget_px,
+        orientation,
     )
 }
 
@@ -67,8 +70,13 @@ pub fn generate_preview_from_linear_rgb(
 pub fn generate_preview_from_display_rgb(
     rgb: &ImageF32,
     budget_px: u32,
+    orientation: i32,
 ) -> Result<(Vec<u8>, u32, u32)> {
-    resize_and_encode_jpeg(&rgb_f32_to_image(rgb, |v| v.clamp(0.0, 1.0)), budget_px)
+    resize_and_encode_jpeg(
+        &rgb_f32_to_image(rgb, |v| v.clamp(0.0, 1.0)),
+        budget_px,
+        orientation,
+    )
 }
 
 /// JPEG-encodes tightly packed display-referred RGBA8 (the develop
@@ -100,7 +108,24 @@ fn rgb_f32_to_image(rgb: &ImageF32, tone: impl Fn(f32) -> f32) -> DynamicImage {
     DynamicImage::ImageRgb8(buf)
 }
 
-fn resize_and_encode_jpeg(src: &DynamicImage, budget_px: u32) -> Result<(Vec<u8>, u32, u32)> {
+/// Turns `src` upright per the EXIF `orientation` tag (1 or unknown: as is).
+fn orient(src: &DynamicImage, orientation: i32) -> Option<DynamicImage> {
+    let o = u8::try_from(orientation)
+        .ok()
+        .and_then(image::metadata::Orientation::from_exif)
+        .filter(|o| *o != image::metadata::Orientation::NoTransforms)?;
+    let mut img = src.clone();
+    img.apply_orientation(o);
+    Some(img)
+}
+
+fn resize_and_encode_jpeg(
+    src: &DynamicImage,
+    budget_px: u32,
+    orientation: i32,
+) -> Result<(Vec<u8>, u32, u32)> {
+    let oriented = orient(src, orientation);
+    let src = oriented.as_ref().unwrap_or(src);
     let (width, height) = (src.width(), src.height());
     let scale = (budget_px as f32 / width.max(height) as f32).min(1.0);
     let dst_width = ((width as f32 * scale).round() as u32).max(1);
@@ -146,7 +171,7 @@ mod tests {
             data,
         };
 
-        let (jpeg, w, h) = generate_preview_from_linear_rgb(&rgb, 100).unwrap();
+        let (jpeg, w, h) = generate_preview_from_linear_rgb(&rgb, 100, 1).unwrap();
         assert_eq!((w, h), (100, 50));
         assert!(!jpeg.is_empty());
         assert_eq!(
@@ -167,7 +192,19 @@ mod tests {
             channels: 4,
             data: vec![0.5f32; 50 * 30 * 4],
         };
-        let (_jpeg, w, h) = generate_preview_from_linear_rgb(&rgb, 320).unwrap();
+        let (_jpeg, w, h) = generate_preview_from_linear_rgb(&rgb, 320, 1).unwrap();
         assert_eq!((w, h), (50, 30));
+    }
+
+    #[test]
+    fn exif_orientation_turns_the_preview_upright() {
+        let rgb = ImageF32 {
+            width: 4,
+            height: 2,
+            channels: 3,
+            data: vec![0.5; 4 * 2 * 3],
+        };
+        let (_, w, h) = generate_preview_from_linear_rgb(&rgb, 100, 6).unwrap();
+        assert_eq!((w, h), (2, 4));
     }
 }
