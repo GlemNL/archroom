@@ -78,7 +78,7 @@ pub fn show(ui: &mut egui::Ui, hist: Option<&Histogram>, clip_on: bool) -> bool 
         painter.rect_stroke(
             rect,
             2.0,
-            egui::Stroke::new(1.0, archroom_ui::ACCENT),
+            egui::Stroke::new(1.0_f32, archroom_ui::ACCENT),
             egui::StrokeKind::Inside,
         );
     }

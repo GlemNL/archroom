@@ -49,13 +49,13 @@ pub fn show(ui: &mut egui::Ui, m: &mut DevelopModule) {
     painter.rect_stroke(
         egui::Rect::from_min_max(to_nav(visible.min), to_nav(visible.max)),
         0.0,
-        egui::Stroke::new(1.5, archroom_ui::ACCENT),
+        egui::Stroke::new(1.5_f32, archroom_ui::ACCENT),
         egui::StrokeKind::Inside,
     );
     painter.rect_stroke(
         rect,
         0.0,
-        egui::Stroke::new(1.0, egui::Color32::from_gray(0x50)),
+        egui::Stroke::new(1.0_f32, egui::Color32::from_gray(0x50)),
         egui::StrokeKind::Inside,
     );
 

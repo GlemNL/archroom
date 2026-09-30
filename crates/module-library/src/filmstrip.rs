@@ -76,7 +76,7 @@ fn show_thumb(ui: &mut egui::Ui, cx: &mut AppCx, photo: &PhotoSummary) {
         painter.rect_stroke(
             rect,
             egui::CornerRadius::same(2),
-            egui::Stroke::new(2.0, archroom_ui::ACCENT),
+            egui::Stroke::new(2.0_f32, archroom_ui::ACCENT),
             egui::StrokeKind::Inside,
         );
     }

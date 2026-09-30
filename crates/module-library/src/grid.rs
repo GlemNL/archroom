@@ -99,7 +99,7 @@ fn show_cell(
         painter.rect_stroke(
             rect,
             CornerRadius::same(3),
-            Stroke::new(2.0, archroom_ui::ACCENT),
+            Stroke::new(2.0_f32, archroom_ui::ACCENT),
             egui::StrokeKind::Inside,
         );
     }

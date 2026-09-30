@@ -496,7 +496,7 @@ impl CropTool {
         );
 
         // Composition overlay.
-        let line = Stroke::new(1.0, Color32::from_white_alpha(110));
+        let line = Stroke::new(1.0_f32, Color32::from_white_alpha(110));
         let fractions: &[f32] = match self.overlay {
             0 => &[1.0 / 3.0, 2.0 / 3.0],
             1 => &[1.0 / 6.0, 2.0 / 6.0, 3.0 / 6.0, 4.0 / 6.0, 5.0 / 6.0],
@@ -524,7 +524,7 @@ impl CropTool {
         painter.rect_stroke(
             crop_rect,
             0.0,
-            Stroke::new(1.5, Color32::WHITE),
+            Stroke::new(1.5_f32, Color32::WHITE),
             egui::StrokeKind::Outside,
         );
         for c in [
@@ -544,7 +544,10 @@ impl CropTool {
             );
         }
         if let Some((a, b)) = self.level_line {
-            painter.line_segment([a, b], Stroke::new(2.0, Color32::from_rgb(255, 210, 60)));
+            painter.line_segment(
+                [a, b],
+                Stroke::new(2.0_f32, Color32::from_rgb(255, 210, 60)),
+            );
             painter.circle_filled(a, 4.0, Color32::from_rgb(255, 210, 60));
             painter.circle_filled(b, 4.0, Color32::from_rgb(255, 210, 60));
         }

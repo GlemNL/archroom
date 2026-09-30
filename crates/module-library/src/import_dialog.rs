@@ -215,18 +215,16 @@ impl ImportDialogState {
                 CatalogEvent::ImportFinished {
                     import_id,
                     imported,
-                } => {
-                    if self.tracked_import_id == Some(import_id) {
-                        let scanned = match self.status {
-                            Status::Running { scanned, .. } => scanned,
-                            _ => imported,
-                        };
-                        self.status = Status::Done {
-                            scanned,
-                            imported,
-                            skipped: scanned.saturating_sub(imported),
-                        };
-                    }
+                } if self.tracked_import_id == Some(import_id) => {
+                    let scanned = match self.status {
+                        Status::Running { scanned, .. } => scanned,
+                        _ => imported,
+                    };
+                    self.status = Status::Done {
+                        scanned,
+                        imported,
+                        skipped: scanned.saturating_sub(imported),
+                    };
                 }
                 _ => {}
             }

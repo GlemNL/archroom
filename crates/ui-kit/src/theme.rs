@@ -18,20 +18,20 @@ pub fn apply(ctx: &Context) {
     visuals.code_bg_color = Color32::from_gray(0x14);
 
     visuals.widgets.noninteractive.bg_fill = Color32::from_gray(0x24);
-    visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0, Color32::from_gray(0xb0));
+    visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0_f32, Color32::from_gray(0xb0));
 
     visuals.widgets.inactive.bg_fill = Color32::from_gray(0x2c);
-    visuals.widgets.inactive.fg_stroke = Stroke::new(1.0, Color32::from_gray(0xc8));
+    visuals.widgets.inactive.fg_stroke = Stroke::new(1.0_f32, Color32::from_gray(0xc8));
 
     visuals.widgets.hovered.bg_fill = Color32::from_gray(0x38);
-    visuals.widgets.hovered.fg_stroke = Stroke::new(1.0, Color32::from_gray(0xf0));
-    visuals.widgets.hovered.bg_stroke = Stroke::new(1.0, ACCENT);
+    visuals.widgets.hovered.fg_stroke = Stroke::new(1.0_f32, Color32::from_gray(0xf0));
+    visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, ACCENT);
 
     visuals.widgets.active.bg_fill = ACCENT;
-    visuals.widgets.active.fg_stroke = Stroke::new(1.0, Color32::WHITE);
+    visuals.widgets.active.fg_stroke = Stroke::new(1.0_f32, Color32::WHITE);
 
     visuals.selection.bg_fill = ACCENT.linear_multiply(0.5);
-    visuals.selection.stroke = Stroke::new(1.0, ACCENT);
+    visuals.selection.stroke = Stroke::new(1.0_f32, ACCENT);
 
     let radius = CornerRadius::same(3);
     visuals.widgets.noninteractive.corner_radius = radius;

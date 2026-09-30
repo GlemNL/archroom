@@ -46,7 +46,7 @@ pub fn curve_editor(
     painter.rect_filled(rect, 2.0, Color32::from_gray(0x14));
     for i in 1..4 {
         let t = i as f32 / 4.0;
-        let stroke = Stroke::new(1.0, Color32::from_gray(0x2a));
+        let stroke = Stroke::new(1.0_f32, Color32::from_gray(0x2a));
         painter.line_segment(
             [
                 Pos2::new(rect.left() + t * rect.width(), rect.top()),
@@ -64,7 +64,7 @@ pub fn curve_editor(
     }
     painter.line_segment(
         [rect.left_bottom(), rect.right_top()],
-        Stroke::new(1.0, Color32::from_gray(0x3c)),
+        Stroke::new(1.0_f32, Color32::from_gray(0x3c)),
     );
     if samples.len() > 1 {
         let n = samples.len() - 1;
@@ -73,12 +73,12 @@ pub fn curve_editor(
             .enumerate()
             .map(|(i, y)| to_screen(rect, [i as f64 / n as f64, f64::from(*y)]))
             .collect();
-        painter.add(egui::Shape::line(line, Stroke::new(1.5, color)));
+        painter.add(egui::Shape::line(line, Stroke::new(1.5_f32, color)));
     }
     painter.rect_stroke(
         rect,
         2.0,
-        Stroke::new(1.0, Color32::from_gray(0x50)),
+        Stroke::new(1.0_f32, Color32::from_gray(0x50)),
         egui::StrokeKind::Inside,
     );
 
@@ -147,7 +147,7 @@ pub fn curve_editor(
             c,
             HANDLE_RADIUS,
             Color32::from_gray(0x14),
-            Stroke::new(1.5, color),
+            Stroke::new(1.5_f32, color),
         );
     }
     if edit == CurveEdit::Changed {

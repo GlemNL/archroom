@@ -7,6 +7,14 @@ targets = []
 [advisories]
 version = 2
 yanked = "deny"
+# Transitive advisories with no fix available without bumping egui/wgpu;
+# revisit when those bump their dependencies.
+ignore = [
+    { id = "RUSTSEC-2024-0436", reason = "paste: via wgpu-hal's macOS-only metal backend" },
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser: via egui's ab_glyph, no replacement yet" },
+    { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.38 via zbus_xml (egui accessibility); only parses local D-Bus introspection XML, fix needs an eframe bump" },
+    { id = "RUSTSEC-2026-0195", reason = "same as RUSTSEC-2026-0194" },
+]
 
 [licenses]
 version = 2
@@ -22,6 +30,9 @@ allow = [
     "Unicode-3.0",
     "Zlib",
     "BSL-1.0",
+    "IJG",              # jpeg-encoder
+    "OFL-1.1",          # egui's bundled default fonts
+    "Ubuntu-font-1.0",  # egui's bundled default fonts
     "MPL-2.0",
     "GPL-3.0-or-later",
     "GPL-2.0-or-later",
