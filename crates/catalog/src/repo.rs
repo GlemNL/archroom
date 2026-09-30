@@ -4,8 +4,8 @@
 //! connection to the same `.arcat` file (see the M1 plan note on why a
 //! background job doesn't share the UI thread's `Catalog`).
 
-use viberoom_core::ids::{FileId, FolderId, ImportId, KeywordId, PhotoId};
 use rusqlite::{Connection, OptionalExtension, params};
+use viberoom_core::ids::{FileId, FolderId, ImportId, KeywordId, PhotoId};
 
 use crate::error::Result;
 

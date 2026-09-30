@@ -5,6 +5,7 @@
 
 use std::path::Path;
 
+use crossbeam_channel::Receiver;
 use viberoom_core::ids::PhotoId;
 use viberoom_engine::analysis::{AutoTone, Proxy, auto_tone, auto_wb, downscale};
 use viberoom_engine::geometry::Geometry;
@@ -16,7 +17,6 @@ use viberoom_engine::render_loop::RenderLoop;
 use viberoom_engine::{EditParams, Orientation};
 use viberoom_io::{DecodeOptions, DecodedImage};
 use viberoom_jobs::{Job, JobContext, Priority, Scheduler};
-use crossbeam_channel::Receiver;
 
 use viberoom_catalog::repo::PhotoFileInfo;
 

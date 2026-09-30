@@ -8,12 +8,12 @@
 
 use std::path::{Path, PathBuf};
 
+use rusqlite::Connection;
 use viberoom_catalog::Catalog;
 use viberoom_catalog::repo;
 use viberoom_core::ids::PhotoId;
 use viberoom_io::xmp::{self, SidecarData};
 use viberoom_jobs::{Job, JobContext, Priority};
-use rusqlite::Connection;
 
 use crate::error::Result;
 

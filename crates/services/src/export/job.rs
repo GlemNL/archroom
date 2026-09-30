@@ -6,6 +6,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use rusqlite::Connection;
 use viberoom_catalog::{Catalog, repo};
 use viberoom_core::events::{CatalogEvent, EventBus};
 use viberoom_core::ids::PhotoId;
@@ -15,7 +16,6 @@ use viberoom_engine::{EditParams, Orientation, geometry};
 use viberoom_io::DecodeOptions;
 use viberoom_io::export_meta::{ExportMetadata, write_export_metadata};
 use viberoom_jobs::{Job, JobContext, Priority};
-use rusqlite::Connection;
 
 use super::encode::{Pixels, encode_to_file};
 use super::{

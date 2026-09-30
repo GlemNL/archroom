@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
+use clap::{Parser, Subcommand};
 use viberoom_catalog::Catalog;
 use viberoom_color::icc::OutputSpace;
 use viberoom_services::import::{ImportMode, ImportOptions, ImportProgressSink, run_import};
-use clap::{Parser, Subcommand};
 
 /// `viberoom-cli`: the headless entry point into the engine, catalog and
 /// services crates (plan §4.1) — used for tests, batch jobs and benchmarks,
@@ -318,6 +318,7 @@ struct RenderArgs {
 }
 
 fn render(a: &RenderArgs) -> Result<()> {
+    use std::time::Instant;
     use viberoom_engine::analysis::{auto_tone, auto_wb, downscale};
     use viberoom_engine::gpu::GpuContext;
     use viberoom_engine::ops::{
@@ -326,7 +327,6 @@ fn render(a: &RenderArgs) -> Result<()> {
     use viberoom_engine::pipeline::{Pipeline, RenderRequest};
     use viberoom_engine::{EditParams, Orientation};
     use viberoom_io::DecodedImage;
-    use std::time::Instant;
 
     let decoder = viberoom_io::decoder_for(&a.file)
         .ok_or_else(|| anyhow::anyhow!("unsupported file: {}", a.file.display()))?;

@@ -5,6 +5,7 @@
 
 use std::path::PathBuf;
 
+use crossbeam_channel::Receiver;
 use viberoom_core::events::CatalogEvent;
 use viberoom_core::ids::PhotoId;
 use viberoom_services::JobHandle;
@@ -14,7 +15,6 @@ use viberoom_services::export::{
     OutputSpace, Resize, TiffCompression, all_presets, delete_preset, expand_name, load_last,
     output_size, save_last, save_preset,
 };
-use crossbeam_channel::Receiver;
 
 use crate::AppCx;
 

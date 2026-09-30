@@ -4,10 +4,10 @@
 //! only the Library one). Not persisted across restarts, matching
 //! Lightroom.
 
+use rusqlite::Connection;
 use viberoom_catalog::Result;
 use viberoom_catalog::command::Command;
 use viberoom_core::events::CatalogEvent;
-use rusqlite::Connection;
 
 #[derive(Default)]
 pub struct UndoStack {

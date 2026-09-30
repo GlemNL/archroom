@@ -4,13 +4,13 @@
 //! handles and a composition overlay on top. All rectangles are normalised
 //! to the canvas, like the `crop` op's.
 
+use egui::{Color32, CursorIcon, Pos2, Rect, Stroke};
 use viberoom_services::engine::EditParams;
 use viberoom_services::engine::Op;
 use viberoom_services::engine::geometry::{
     MIN_CROP, constrain_between, fit_rect, level_angle, mirror_rect, rotate_rect_cw, sanitize,
 };
 use viberoom_services::engine::ops::{Crop, Straighten, StraightenParams};
-use egui::{Color32, CursorIcon, Pos2, Rect, Stroke};
 
 use crate::basic::{Change, spec_slider};
 

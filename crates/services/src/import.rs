@@ -9,13 +9,13 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use rusqlite::Connection;
 use viberoom_catalog::Catalog;
 use viberoom_catalog::repo;
 use viberoom_core::events::{CatalogEvent, EventBus};
 use viberoom_core::ids::{FolderId, ImportId, PhotoId};
 use viberoom_jobs::{Job, JobContext, Priority as JobPriority};
 use viberoom_preview::{L1_BUDGET_PX, LEVEL_L1, PreviewCache};
-use rusqlite::Connection;
 
 use crate::error::Result;
 

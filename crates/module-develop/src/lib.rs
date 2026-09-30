@@ -18,6 +18,7 @@ mod presets_panel;
 
 use std::time::{Duration, Instant};
 
+use crossbeam_channel::Receiver;
 use viberoom_core::ids::PhotoId;
 use viberoom_services::catalog_develop::{HistoryRow, SnapshotRow};
 use viberoom_services::engine::ops::{Profile, Treatment, default_registry};
@@ -29,7 +30,6 @@ use viberoom_services::rerender::RerenderPreviewsJob;
 use viberoom_services::session::{Session, open_in_background};
 use viberoom_services::{catalog_develop, develop};
 use viberoom_shell::{AppCx, Module, ModuleId};
-use crossbeam_channel::Receiver;
 
 /// Slider drags on one control become a history step this long after the
 /// last movement (a database write per frame would stutter).

@@ -10,9 +10,9 @@
 //! `revert` can restore them exactly — the session-scoped undo stack that
 //! holds these (plan §4.5) lives in `viberoom-shell`, not here.
 
+use rusqlite::{Connection, OptionalExtension, params};
 use viberoom_core::events::{CatalogEvent, PhotoField};
 use viberoom_core::ids::{CollectionId, KeywordId, PhotoId};
-use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::error::Result;
 use crate::{collections, repo};

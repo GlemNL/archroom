@@ -8,10 +8,10 @@
 
 use std::sync::atomic::{AtomicU8, AtomicU32, Ordering};
 
-use viberoom_io::ImageF32;
 use fast_image_resize::images::Image as FirImage;
 use fast_image_resize::{IntoImageView, Resizer};
 use image::{DynamicImage, ExtendedColorType, ImageEncoder};
+use viberoom_io::ImageF32;
 
 use crate::error::{Error, Result};
 

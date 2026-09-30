@@ -6,8 +6,8 @@
 
 use std::path::{Path, PathBuf};
 
-use viberoom_core::ids::PhotoId;
 use rusqlite::{Connection, OptionalExtension, params};
+use viberoom_core::ids::PhotoId;
 
 use crate::error::{Error, Result};
 
