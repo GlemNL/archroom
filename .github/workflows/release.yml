@@ -100,7 +100,7 @@ jobs:
       - name: Install build tools
         run: |
           dnf install -y rpm-build cargo rust gcc clang clang-devel pkgconf-pkg-config \
-            LibRaw-devel lcms2-devel gexiv2-devel
+            LibRaw-devel lcms2-devel 'pkgconfig(gexiv2)'
       - uses: actions/checkout@v4
         with:
           path: repo

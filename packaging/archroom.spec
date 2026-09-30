@@ -19,7 +19,7 @@ BuildRequires:  clang-devel
 BuildRequires:  pkgconfig
 BuildRequires:  LibRaw-devel >= 0.20
 BuildRequires:  lcms2-devel
-BuildRequires:  gexiv2-devel
+BuildRequires:  pkgconfig(gexiv2)
 Requires:       vulkan-loader
 Recommends:     mesa-vulkan-drivers
 Recommends:     xdg-desktop-portal
