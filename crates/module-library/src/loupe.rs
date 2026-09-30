@@ -4,8 +4,7 @@
 //! honest about what M1 has, not a rounding error.
 //!
 //! The L2 preview generates lazily on first view of a photo, synchronously
-//! on the UI thread (the same accepted M0-spike tradeoff, plan roadmap
-//! note in `crates/io/src/libraw_spike.rs`) — a raw with no cached L2 can
+//! on the UI thread (an accepted tradeoff) — a raw with no cached L2 can
 //! visibly stutter for about the time a full decode takes (~1s per the M0
 //! benchmark) before its first paint. A background-job-based prefetch is a
 //! fast-follow, not required for M1 Phase C.

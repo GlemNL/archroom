@@ -21,10 +21,6 @@ archroom-ui = { workspace = true }
 archroom-services = { workspace = true }
 archroom-module-library = { workspace = true }
 archroom-module-develop = { workspace = true }
-# M0 spike only (see src/spike_view.rs) — the real Develop module reaches
-# these through archroom-services once M3 builds the real pipeline.
-archroom-io = { workspace = true }
-archroom-engine = { workspace = true }
 eframe = { version = "0.33", default-features = false, features = ["default_fonts", "wgpu", "persistence", "wayland", "x11", "accesskit"] }
 egui = "0.33"
 # "file" + "image": the Grid/Loupe (module-library) load preview JPEGs via

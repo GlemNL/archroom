@@ -1,5 +1,4 @@
 mod app;
-mod spike_view;
 
 use app::ArchroomApp;
 

@@ -1,10 +1,5 @@
-//! The production `Decoder` for raw files, replacing `libraw_spike` (plan
-//! roadmap M1: "`libraw-sys` plus a safe wrapper: open, metadata, embedded
-//! thumbnail, process"). `libraw_spike.rs` itself is untouched and keeps
-//! serving the app's M0 debug window until M3 replaces that window with the
-//! real Develop canvas; this module duplicates its raw-prep recipe
-//! (reference-WB demosaic, linear output, plan §6.3) rather than sharing
-//! code with it, since the two are expected to diverge once Develop lands.
+//! The production `Decoder` for raw files (plan roadmap M1: "`libraw-sys`
+//! plus a safe wrapper: open, metadata, embedded thumbnail, process").
 
 use rayon::prelude::*;
 use std::ffi::CString;
@@ -83,8 +78,7 @@ impl Decoder for RawDecoder {
 
             let camera = read_camera_color(&handle);
 
-            // Same recipe as `libraw_spike::decode_to_linear_rgb_f32` (plan
-            // §6.3): demosaic once at the reference white balance, in raw
+            // Plan §6.3: demosaic once at the reference white balance, in raw
             // camera space, linear light. `max_long_edge` proxy sizing is
             // M3 work (the raw-prep/proxy pipeline); Phase A always decodes
             // full resolution.
@@ -365,9 +359,9 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs ARCHROOM_SPIKE_RAW pointing at a real raw file"]
+    #[ignore = "needs ARCHROOM_TEST_RAW pointing at a real raw file"]
     fn decodes_metadata_and_pixels_from_a_real_raw_file() {
-        let path = std::env::var("ARCHROOM_SPIKE_RAW").expect("set ARCHROOM_SPIKE_RAW");
+        let path = std::env::var("ARCHROOM_TEST_RAW").expect("set ARCHROOM_TEST_RAW");
         let path = Path::new(&path);
         let d = RawDecoder;
 

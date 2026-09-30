@@ -3,7 +3,6 @@
 pub mod export_meta;
 mod image_rs;
 mod libraw;
-mod libraw_spike;
 mod metadata;
 mod types;
 pub mod xmp;
@@ -12,7 +11,6 @@ use std::path::Path;
 
 pub use image_rs::ImageDecoder;
 pub use libraw::RawDecoder;
-pub use libraw_spike::decode_to_linear_rgb_f32;
 pub use metadata::read_exif_summary;
 pub use types::{
     CameraColor, DecodeOptions, DecodedImage, Decoder, ImageF32, ImageMetadata, Priority,

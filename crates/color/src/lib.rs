@@ -45,8 +45,8 @@ impl Mat3 {
 }
 
 /// The sRGB opto-electronic transfer function (linear → display-encoded),
-/// used only by the M0 spike shader for a quick preview; the real output
-/// stage (§6.9) builds its transform from `lcms2` in M3.
+/// for quick previews; the real output stage (§6.9) builds its transform
+/// from `lcms2`.
 pub fn srgb_oetf(linear: f32) -> f32 {
     if linear <= 0.003_130_8 {
         linear * 12.92

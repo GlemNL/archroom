@@ -1,6 +1,5 @@
 //! `archroom-engine`: the `Op` registry, edit params, raw-prep color glue
-//! and (from Phase B) the GPU pipeline (plan §4.1/§6). `spike` is the M0
-//! GPU-architecture validation, kept separate from the real pipeline.
+//! and (from Phase B) the GPU pipeline (plan §4.1/§6).
 
 pub mod analysis;
 pub mod cache;
@@ -14,7 +13,6 @@ pub mod params;
 pub mod pipeline;
 pub mod rawprep;
 pub mod render_loop;
-pub mod spike;
 pub mod tone;
 
 #[cfg(test)]

@@ -393,7 +393,11 @@ fn metadata_panel(ui: &mut egui::Ui, cx: &mut AppCx, state: &mut RightPanelState
                     exif_row(ui, "Lens", lens);
                 }
                 if let Some(aperture) = exif.aperture {
-                    exif_row(ui, "Aperture", &format!("f/{}", (aperture * 10.0).round() / 10.0));
+                    exif_row(
+                        ui,
+                        "Aperture",
+                        &format!("f/{}", (aperture * 10.0).round() / 10.0),
+                    );
                 }
                 if let Some(shutter) = exif.shutter.filter(|s| *s > 0.0) {
                     exif_row(ui, "Shutter", &shutter_string(shutter));

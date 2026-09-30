@@ -71,11 +71,6 @@ fn allowed_rules() -> HashMap<&'static str, BTreeSet<&'static str>> {
             "shell",
             "module-library",
             "module-develop",
-            // M0 spike only (src/spike_view.rs): direct io/engine access
-            // to validate D1. Remove once M3's real Develop canvas reaches
-            // these through archroom-services instead.
-            "io",
-            "engine",
         ]
         .into_iter()
         .collect(),
