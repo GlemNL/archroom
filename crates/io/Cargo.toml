@@ -1,5 +1,5 @@
 [package]
-name = "archroom-io"
+name = "viberoom-io"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,8 +10,8 @@ workspace = true
 
 [dependencies]
 rayon = { workspace = true }
-archroom-core = { workspace = true }
-archroom-color = { workspace = true }
+viberoom-core = { workspace = true }
+viberoom-color = { workspace = true }
 libraw-sys = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

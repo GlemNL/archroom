@@ -167,7 +167,7 @@ CREATE TABLE schema_meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
-INSERT INTO schema_meta(key, value) VALUES ('created_by', 'archroom');
+INSERT INTO schema_meta(key, value) VALUES ('created_by', 'viberoom');
 "#;
 
 /// Develop presets (plan §8.1): a named set of settings groups plus the
@@ -184,7 +184,7 @@ CREATE TABLE presets (
 "#;
 
 /// Export presets (plan §9): a named, opaque JSON blob of export settings;
-/// its meaning lives in `archroom-services`.
+/// its meaning lives in `viberoom-services`.
 const V3: &str = r#"
 CREATE TABLE export_presets (
   id INTEGER PRIMARY KEY,

@@ -5,20 +5,20 @@
 
 use std::path::Path;
 
-use archroom_core::ids::PhotoId;
-use archroom_engine::analysis::{AutoTone, Proxy, auto_tone, auto_wb, downscale};
-use archroom_engine::geometry::Geometry;
-use archroom_engine::gpu::GpuContext;
-use archroom_engine::ops::{Profile, WbMode, WhiteBalance, WhiteBalanceParams};
-use archroom_engine::pipeline::Pipeline;
-use archroom_engine::rawprep::SceneColor;
-use archroom_engine::render_loop::RenderLoop;
-use archroom_engine::{EditParams, Orientation};
-use archroom_io::{DecodeOptions, DecodedImage};
-use archroom_jobs::{Job, JobContext, Priority, Scheduler};
+use viberoom_core::ids::PhotoId;
+use viberoom_engine::analysis::{AutoTone, Proxy, auto_tone, auto_wb, downscale};
+use viberoom_engine::geometry::Geometry;
+use viberoom_engine::gpu::GpuContext;
+use viberoom_engine::ops::{Profile, WbMode, WhiteBalance, WhiteBalanceParams};
+use viberoom_engine::pipeline::Pipeline;
+use viberoom_engine::rawprep::SceneColor;
+use viberoom_engine::render_loop::RenderLoop;
+use viberoom_engine::{EditParams, Orientation};
+use viberoom_io::{DecodeOptions, DecodedImage};
+use viberoom_jobs::{Job, JobContext, Priority, Scheduler};
 use crossbeam_channel::Receiver;
 
-use archroom_catalog::repo::PhotoFileInfo;
+use viberoom_catalog::repo::PhotoFileInfo;
 
 const PROXY_EDGE: u32 = 512;
 
@@ -47,19 +47,19 @@ impl Analysis {
     }
 
     /// The decoded→working matrix under `edit`'s white balance.
-    fn to_working(&self, edit: &EditParams) -> archroom_color::Mat3d {
+    fn to_working(&self, edit: &EditParams) -> viberoom_color::Mat3d {
         match &self.scene {
             Some(sc) => {
                 let wb = edit.get::<WhiteBalance>();
                 let illuminant = match wb.mode {
                     WbMode::AsShot => sc.as_shot_white(),
-                    WbMode::Custom => archroom_color::temp::temp_tint_to_xy(wb.temp, wb.tint),
+                    WbMode::Custom => viberoom_color::temp::temp_tint_to_xy(wb.temp, wb.tint),
                 };
-                sc.decoded_to_working(illuminant, archroom_color::cat::Cat::Cat16)
+                sc.decoded_to_working(illuminant, viberoom_color::cat::Cat::Cat16)
             }
-            None => archroom_color::cie::REC2020
+            None => viberoom_color::cie::REC2020
                 .xyz_to_rgb()
-                .mul(&archroom_color::cie::SRGB.rgb_to_xyz()),
+                .mul(&viberoom_color::cie::SRGB.rgb_to_xyz()),
         }
     }
 
@@ -109,7 +109,7 @@ impl Analysis {
         if med.iter().any(|c| *c <= 1e-4) {
             return None;
         }
-        let (temp, tint) = archroom_color::temp::xy_to_temp_tint(sc.white_from_decoded(med));
+        let (temp, tint) = viberoom_color::temp::xy_to_temp_tint(sc.white_from_decoded(med));
         Some((temp.round(), tint.round()))
     }
 }
@@ -133,7 +133,7 @@ fn open(
     info: &PhotoFileInfo,
 ) -> std::result::Result<Session, String> {
     let path: &Path = &info.path;
-    let decoder = archroom_io::decoder_for(path)
+    let decoder = viberoom_io::decoder_for(path)
         .ok_or_else(|| format!("unsupported file: {}", path.display()))?;
     let decoded = decoder
         .decode(path, &DecodeOptions::default())

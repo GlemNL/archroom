@@ -1,16 +1,16 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use archroom_catalog::Catalog;
-use archroom_color::icc::OutputSpace;
-use archroom_services::import::{ImportMode, ImportOptions, ImportProgressSink, run_import};
+use viberoom_catalog::Catalog;
+use viberoom_color::icc::OutputSpace;
+use viberoom_services::import::{ImportMode, ImportOptions, ImportProgressSink, run_import};
 use clap::{Parser, Subcommand};
 
-/// `archroom-cli`: the headless entry point into the engine, catalog and
+/// `viberoom-cli`: the headless entry point into the engine, catalog and
 /// services crates (plan §4.1) — used for tests, batch jobs and benchmarks,
 /// and to keep the UI toolkit replaceable.
 #[derive(Parser)]
-#[command(name = "archroom-cli", version)]
+#[command(name = "viberoom-cli", version)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -114,7 +114,7 @@ enum CatalogAction {
 }
 
 fn main() -> Result<()> {
-    archroom_core::tracing_setup::init();
+    viberoom_core::tracing_setup::init();
     let cli = Cli::parse();
 
     match cli.command {
@@ -148,10 +148,10 @@ fn main() -> Result<()> {
             conflict,
             metadata,
         } => {
-            use archroom_catalog::repo::{PhotoSort, list_all_photos};
-            use archroom_core::ids::PhotoId;
-            use archroom_services::export::job::{ExportRequest, ExportSink, run_export};
-            use archroom_services::export::{
+            use viberoom_catalog::repo::{PhotoSort, list_all_photos};
+            use viberoom_core::ids::PhotoId;
+            use viberoom_services::export::job::{ExportRequest, ExportSink, run_export};
+            use viberoom_services::export::{
                 Conflict, Destination, Format, MetadataMode, Resize, all_presets,
             };
             let cat = Catalog::create_or_open(&catalog)?;
@@ -225,7 +225,7 @@ fn main() -> Result<()> {
                 photos.into_iter().map(PhotoId::new).collect()
             };
             drop(cat);
-            let gpu = archroom_engine::gpu::GpuContext::headless()
+            let gpu = viberoom_engine::gpu::GpuContext::headless()
                 .ok_or_else(|| anyhow::anyhow!("no usable Vulkan adapter"))?;
             struct Stdout;
             impl ExportSink for Stdout {
@@ -318,20 +318,20 @@ struct RenderArgs {
 }
 
 fn render(a: &RenderArgs) -> Result<()> {
-    use archroom_engine::analysis::{auto_tone, auto_wb, downscale};
-    use archroom_engine::gpu::GpuContext;
-    use archroom_engine::ops::{
+    use viberoom_engine::analysis::{auto_tone, auto_wb, downscale};
+    use viberoom_engine::gpu::GpuContext;
+    use viberoom_engine::ops::{
         Exposure, ExposureParams, Profile, Tone, WbMode, WhiteBalance, WhiteBalanceParams,
     };
-    use archroom_engine::pipeline::{Pipeline, RenderRequest};
-    use archroom_engine::{EditParams, Orientation};
-    use archroom_io::DecodedImage;
+    use viberoom_engine::pipeline::{Pipeline, RenderRequest};
+    use viberoom_engine::{EditParams, Orientation};
+    use viberoom_io::DecodedImage;
     use std::time::Instant;
 
-    let decoder = archroom_io::decoder_for(&a.file)
+    let decoder = viberoom_io::decoder_for(&a.file)
         .ok_or_else(|| anyhow::anyhow!("unsupported file: {}", a.file.display()))?;
     let t = Instant::now();
-    let decoded = decoder.decode(&a.file, &archroom_io::DecodeOptions::default())?;
+    let decoded = decoder.decode(&a.file, &viberoom_io::DecodeOptions::default())?;
     let decode_ms = t.elapsed().as_millis();
     let orientation = if a.no_orient {
         Orientation::IDENTITY
@@ -351,7 +351,7 @@ fn render(a: &RenderArgs) -> Result<()> {
     };
 
     let gpu = GpuContext::headless()
-        .ok_or_else(|| anyhow::anyhow!("no Vulkan adapter (set ARCHROOM_ADAPTER to pick one)"))?;
+        .ok_or_else(|| anyhow::anyhow!("no Vulkan adapter (set VIBEROOM_ADAPTER to pick one)"))?;
     let t = Instant::now();
     let mut pipeline = Pipeline::new(&gpu, &decoded)?;
     let upload_ms = t.elapsed().as_millis();
@@ -363,7 +363,7 @@ fn render(a: &RenderArgs) -> Result<()> {
         };
         let proxy = downscale(rgb, 512, rendered);
         if let DecodedImage::SceneLinear { camera, .. } = &decoded
-            && let Some(sc) = archroom_engine::rawprep::SceneColor::new(camera)
+            && let Some(sc) = viberoom_engine::rawprep::SceneColor::new(camera)
         {
             if let Some((temp, tint)) = auto_wb(&proxy, &sc) {
                 edit.set::<WhiteBalance>(WhiteBalanceParams {
@@ -375,17 +375,17 @@ fn render(a: &RenderArgs) -> Result<()> {
             let wb = edit.get::<WhiteBalance>();
             let illuminant = match wb.mode {
                 WbMode::AsShot => sc.as_shot_white(),
-                WbMode::Custom => archroom_color::temp::temp_tint_to_xy(wb.temp, wb.tint),
+                WbMode::Custom => viberoom_color::temp::temp_tint_to_xy(wb.temp, wb.tint),
             };
-            let m = sc.decoded_to_working(illuminant, archroom_color::cat::Cat::Cat16);
+            let m = sc.decoded_to_working(illuminant, viberoom_color::cat::Cat::Cat16);
             if let Some(at) = auto_tone(&proxy, &m, &edit.get::<Profile>(), false) {
                 edit.set::<Exposure>(ExposureParams { ev: at.exposure_ev });
                 edit.set::<Tone>(at.tone);
             }
         } else {
-            let m = archroom_color::cie::REC2020
+            let m = viberoom_color::cie::REC2020
                 .xyz_to_rgb()
-                .mul(&archroom_color::cie::SRGB.rgb_to_xyz());
+                .mul(&viberoom_color::cie::SRGB.rgb_to_xyz());
             if let Some(at) = auto_tone(&proxy, &m, &edit.get::<Profile>(), true) {
                 edit.set::<Exposure>(ExposureParams { ev: at.exposure_ev });
                 edit.set::<Tone>(at.tone);

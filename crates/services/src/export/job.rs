@@ -6,15 +6,15 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use archroom_catalog::{Catalog, repo};
-use archroom_core::events::{CatalogEvent, EventBus};
-use archroom_core::ids::PhotoId;
-use archroom_engine::gpu::GpuContext;
-use archroom_engine::pipeline::{Pipeline, RenderRequest};
-use archroom_engine::{EditParams, Orientation, geometry};
-use archroom_io::DecodeOptions;
-use archroom_io::export_meta::{ExportMetadata, write_export_metadata};
-use archroom_jobs::{Job, JobContext, Priority};
+use viberoom_catalog::{Catalog, repo};
+use viberoom_core::events::{CatalogEvent, EventBus};
+use viberoom_core::ids::PhotoId;
+use viberoom_engine::gpu::GpuContext;
+use viberoom_engine::pipeline::{Pipeline, RenderRequest};
+use viberoom_engine::{EditParams, Orientation, geometry};
+use viberoom_io::DecodeOptions;
+use viberoom_io::export_meta::{ExportMetadata, write_export_metadata};
+use viberoom_jobs::{Job, JobContext, Priority};
 use rusqlite::Connection;
 
 use super::encode::{Pixels, encode_to_file};
@@ -176,7 +176,7 @@ fn render(
     settings: &ExportSettings,
 ) -> Result<(u32, u32, Pixels)> {
     let t0 = std::time::Instant::now();
-    let decoder = archroom_io::decoder_for(&info.path)
+    let decoder = viberoom_io::decoder_for(&info.path)
         .ok_or_else(|| Error::Other(format!("no decoder for {}", info.path.display())))?;
     let decoded = decoder.decode(&info.path, &DecodeOptions::default())?;
     let t_decode = t0.elapsed();

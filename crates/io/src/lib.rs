@@ -1,4 +1,4 @@
-//! `archroom-io`: decoders (LibRaw, image) and metadata (exiv2).
+//! `viberoom-io`: decoders (LibRaw, image) and metadata (exiv2).
 
 pub mod export_meta;
 mod image_rs;

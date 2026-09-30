@@ -1,7 +1,7 @@
 //! The History list (plan §8.1): click a step to go back to it.
 
-use archroom_services::engine::EditParams;
-use archroom_shell::AppCx;
+use viberoom_services::engine::EditParams;
+use viberoom_shell::AppCx;
 
 use crate::DevelopModule;
 

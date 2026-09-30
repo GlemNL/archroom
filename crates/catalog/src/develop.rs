@@ -1,9 +1,9 @@
 //! Persistence for Develop (plan §5.1/§5.2): the current settings per photo,
 //! its linear edit history and named snapshots. The catalog stores params
 //! as opaque JSON text plus the caller-computed hash — `EditParams` lives in
-//! `archroom-engine`, which this crate must not depend on.
+//! `viberoom-engine`, which this crate must not depend on.
 
-use archroom_core::ids::PhotoId;
+use viberoom_core::ids::PhotoId;
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::error::Result;

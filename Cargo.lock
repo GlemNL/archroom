@@ -271,238 +271,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "archroom-app"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "archroom-catalog",
- "archroom-core",
- "archroom-jobs",
- "archroom-module-develop",
- "archroom-module-library",
- "archroom-services",
- "archroom-shell",
- "archroom-ui",
- "crossbeam-channel",
- "directories",
- "eframe",
- "egui",
- "egui_extras",
- "tracing",
- "wgpu",
-]
-
-[[package]]
-name = "archroom-catalog"
-version = "0.1.0"
-dependencies = [
- "archroom-core",
- "rusqlite",
- "rusqlite_migration",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
- "tracing",
- "xxhash-rust",
-]
-
-[[package]]
-name = "archroom-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "archroom-catalog",
- "archroom-color",
- "archroom-core",
- "archroom-engine",
- "archroom-io",
- "archroom-services",
- "clap",
- "image",
- "serde_json",
- "tracing",
-]
-
-[[package]]
-name = "archroom-color"
-version = "0.1.0"
-dependencies = [
- "approx",
- "archroom-core",
- "lcms2",
- "proptest",
- "serde",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "archroom-core"
-version = "0.1.0"
-dependencies = [
- "crossbeam-channel",
- "directories",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
- "toml",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "archroom-engine"
-version = "0.1.0"
-dependencies = [
- "approx",
- "archroom-color",
- "archroom-core",
- "archroom-io",
- "bytemuck",
- "half",
- "image",
- "pollster",
- "proptest",
- "rayon",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "tracing",
- "wgpu",
- "xxhash-rust",
-]
-
-[[package]]
-name = "archroom-io"
-version = "0.1.0"
-dependencies = [
- "archroom-color",
- "archroom-core",
- "image",
- "libraw-sys",
- "rayon",
- "rexiv2",
- "tempfile",
- "thiserror 2.0.21",
- "tracing",
-]
-
-[[package]]
-name = "archroom-jobs"
-version = "0.1.0"
-dependencies = [
- "archroom-core",
- "crossbeam-channel",
- "rayon",
- "tracing",
-]
-
-[[package]]
-name = "archroom-module-develop"
-version = "0.1.0"
-dependencies = [
- "archroom-core",
- "archroom-services",
- "archroom-shell",
- "archroom-ui",
- "crossbeam-channel",
- "egui",
- "egui-wgpu",
- "rfd",
- "tracing",
-]
-
-[[package]]
-name = "archroom-module-library"
-version = "0.1.0"
-dependencies = [
- "archroom-core",
- "archroom-services",
- "archroom-shell",
- "archroom-ui",
- "crossbeam-channel",
- "egui",
- "open",
- "rfd",
- "tracing",
-]
-
-[[package]]
-name = "archroom-preview"
-version = "0.1.0"
-dependencies = [
- "archroom-catalog",
- "archroom-core",
- "archroom-engine",
- "archroom-io",
- "fast_image_resize",
- "image",
- "rusqlite",
- "tempfile",
- "thiserror 2.0.21",
- "tracing",
-]
-
-[[package]]
-name = "archroom-services"
-version = "0.1.0"
-dependencies = [
- "archroom-catalog",
- "archroom-color",
- "archroom-core",
- "archroom-engine",
- "archroom-io",
- "archroom-jobs",
- "archroom-preview",
- "crossbeam-channel",
- "image",
- "jpeg-encoder",
- "open",
- "rexiv2",
- "rusqlite",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
- "tiff",
- "tracing",
- "trash",
- "walkdir",
- "xxhash-rust",
-]
-
-[[package]]
-name = "archroom-shell"
-version = "0.1.0"
-dependencies = [
- "archroom-catalog",
- "archroom-core",
- "archroom-jobs",
- "archroom-services",
- "archroom-ui",
- "crossbeam-channel",
- "egui",
- "egui-wgpu",
- "open",
- "rfd",
- "rusqlite",
- "tempfile",
- "tracing",
-]
-
-[[package]]
-name = "archroom-ui"
-version = "0.1.0"
-dependencies = [
- "archroom-core",
- "egui",
- "egui_extras",
- "egui_kittest",
- "serde",
-]
-
-[[package]]
 name = "arrayvec"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4359,6 +4127,238 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "viberoom-app"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "crossbeam-channel",
+ "directories",
+ "eframe",
+ "egui",
+ "egui_extras",
+ "tracing",
+ "viberoom-catalog",
+ "viberoom-core",
+ "viberoom-jobs",
+ "viberoom-module-develop",
+ "viberoom-module-library",
+ "viberoom-services",
+ "viberoom-shell",
+ "viberoom-ui",
+ "wgpu",
+]
+
+[[package]]
+name = "viberoom-catalog"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "rusqlite_migration",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tracing",
+ "viberoom-core",
+ "xxhash-rust",
+]
+
+[[package]]
+name = "viberoom-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "image",
+ "serde_json",
+ "tracing",
+ "viberoom-catalog",
+ "viberoom-color",
+ "viberoom-core",
+ "viberoom-engine",
+ "viberoom-io",
+ "viberoom-services",
+]
+
+[[package]]
+name = "viberoom-color"
+version = "0.1.0"
+dependencies = [
+ "approx",
+ "lcms2",
+ "proptest",
+ "serde",
+ "thiserror 2.0.21",
+ "viberoom-core",
+]
+
+[[package]]
+name = "viberoom-core"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-channel",
+ "directories",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "viberoom-engine"
+version = "0.1.0"
+dependencies = [
+ "approx",
+ "bytemuck",
+ "half",
+ "image",
+ "pollster",
+ "proptest",
+ "rayon",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tracing",
+ "viberoom-color",
+ "viberoom-core",
+ "viberoom-io",
+ "wgpu",
+ "xxhash-rust",
+]
+
+[[package]]
+name = "viberoom-io"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "libraw-sys",
+ "rayon",
+ "rexiv2",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tracing",
+ "viberoom-color",
+ "viberoom-core",
+]
+
+[[package]]
+name = "viberoom-jobs"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-channel",
+ "rayon",
+ "tracing",
+ "viberoom-core",
+]
+
+[[package]]
+name = "viberoom-module-develop"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-channel",
+ "egui",
+ "egui-wgpu",
+ "rfd",
+ "tracing",
+ "viberoom-core",
+ "viberoom-services",
+ "viberoom-shell",
+ "viberoom-ui",
+]
+
+[[package]]
+name = "viberoom-module-library"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-channel",
+ "egui",
+ "open",
+ "rfd",
+ "tracing",
+ "viberoom-core",
+ "viberoom-services",
+ "viberoom-shell",
+ "viberoom-ui",
+]
+
+[[package]]
+name = "viberoom-preview"
+version = "0.1.0"
+dependencies = [
+ "fast_image_resize",
+ "image",
+ "rusqlite",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tracing",
+ "viberoom-catalog",
+ "viberoom-core",
+ "viberoom-engine",
+ "viberoom-io",
+]
+
+[[package]]
+name = "viberoom-services"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-channel",
+ "image",
+ "jpeg-encoder",
+ "open",
+ "rexiv2",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tiff",
+ "tracing",
+ "trash",
+ "viberoom-catalog",
+ "viberoom-color",
+ "viberoom-core",
+ "viberoom-engine",
+ "viberoom-io",
+ "viberoom-jobs",
+ "viberoom-preview",
+ "walkdir",
+ "xxhash-rust",
+]
+
+[[package]]
+name = "viberoom-shell"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-channel",
+ "egui",
+ "egui-wgpu",
+ "open",
+ "rfd",
+ "rusqlite",
+ "tempfile",
+ "tracing",
+ "viberoom-catalog",
+ "viberoom-core",
+ "viberoom-jobs",
+ "viberoom-services",
+ "viberoom-ui",
+]
+
+[[package]]
+name = "viberoom-ui"
+version = "0.1.0"
+dependencies = [
+ "egui",
+ "egui_extras",
+ "egui_kittest",
+ "serde",
+ "viberoom-core",
+]
 
 [[package]]
 name = "wait-timeout"

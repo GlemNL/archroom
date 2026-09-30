@@ -1,4 +1,4 @@
-//! `archroom-module-library`: the Library module (plan §7). M1 Phase B/C
+//! `viberoom-module-library`: the Library module (plan §7). M1 Phase B/C
 //! wires up import, the Grid, Loupe and filmstrip against the real
 //! catalog; Organize (ratings/flags/keywords/collections/filter bar) is
 //! M2.
@@ -14,8 +14,8 @@ mod photos;
 mod right_panel;
 mod shortcuts;
 
-use archroom_services::command::{RotatePhotos, SetFlag};
-use archroom_shell::{AppCx, ExportRequestKind, Module, ModuleId};
+use viberoom_services::command::{RotatePhotos, SetFlag};
+use viberoom_shell::{AppCx, ExportRequestKind, Module, ModuleId};
 use import_dialog::ImportDialogState;
 use photos::LibraryData;
 use right_panel::RightPanelState;
@@ -121,7 +121,7 @@ impl Module for LibraryModule {
                 {
                     self.zoom = loupe::Zoom::TwoToOne;
                 }
-                archroom_shell::click_zoom_picker(ui, cx);
+                viberoom_shell::click_zoom_picker(ui, cx);
             }
         }
 

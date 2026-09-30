@@ -1,14 +1,14 @@
 //! The Basic panel (plan §8.2): Treatment, Profile, White Balance, Tone and
 //! Presence. Sliders come from each op's `ParamSpec`s.
 
-use archroom_services::engine::op::ParamSpec;
-use archroom_services::engine::ops::{
+use viberoom_services::engine::op::ParamSpec;
+use viberoom_services::engine::ops::{
     Clarity, Exposure, Presence, Profile, ProfileName, Tone, Treatment, WbMode, WhiteBalance,
     WhiteBalanceParams,
 };
-use archroom_services::engine::{EditParams, Op};
-use archroom_services::session::Analysis;
-use archroom_ui::LrSlider;
+use viberoom_services::engine::{EditParams, Op};
+use viberoom_services::session::Analysis;
+use viberoom_ui::LrSlider;
 
 /// What the panel changed this frame. `immediate` edits (buttons, menus)
 /// are written to history at once; slider drags wait for the debounce.
@@ -209,7 +209,7 @@ pub fn show(
             .clicked()
             && let Some(a) = info.analysis.and_then(|an| an.auto_tone(params))
         {
-            params.set::<Exposure>(archroom_services::engine::ops::ExposureParams {
+            params.set::<Exposure>(viberoom_services::engine::ops::ExposureParams {
                 ev: a.exposure_ev,
             });
             params.set::<Tone>(a.tone);

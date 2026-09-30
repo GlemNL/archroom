@@ -13,13 +13,13 @@ use std::path::Path;
 use anyhow::{Context, Result, bail};
 
 /// Maps a crate's Cargo.toml package name back to its `crates/<dir>` name,
-/// since the two aren't always identical (`archroom-ui` lives in
-/// `ui-kit`, `libraw-sys` has no `archroom-` prefix).
+/// since the two aren't always identical (`viberoom-ui` lives in
+/// `ui-kit`, `libraw-sys` has no `viberoom-` prefix).
 fn package_to_dir(package: &str) -> &str {
     match package {
-        "archroom-ui" => "ui-kit",
+        "viberoom-ui" => "ui-kit",
         "libraw-sys" => "libraw-sys",
-        other => other.strip_prefix("archroom-").unwrap_or(other),
+        other => other.strip_prefix("viberoom-").unwrap_or(other),
     }
 }
 
@@ -95,7 +95,7 @@ fn internal_deps_of(cargo_toml_path: &Path) -> Result<Vec<String>> {
             continue;
         };
         for key in table.keys() {
-            if key.starts_with("archroom-") || key == "libraw-sys" {
+            if key.starts_with("viberoom-") || key == "libraw-sys" {
                 deps.push(package_to_dir(key).to_string());
             }
         }

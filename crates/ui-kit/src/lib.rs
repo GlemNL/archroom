@@ -1,5 +1,5 @@
-//! `archroom-ui`: reusable egui widgets and the app theme. Depends only on
-//! `egui` and `archroom-core` (plan §4.2) — no catalog, no engine.
+//! `viberoom-ui`: reusable egui widgets and the app theme. Depends only on
+//! `egui` and `viberoom-core` (plan §4.2) — no catalog, no engine.
 
 mod curve_editor;
 mod slider;

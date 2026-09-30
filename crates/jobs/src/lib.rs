@@ -1,4 +1,4 @@
-//! `archroom-jobs`: the background job scheduler (plan §4.6). The UI thread
+//! `viberoom-jobs`: the background job scheduler (plan §4.6). The UI thread
 //! never blocks; everything expensive — decoding, DB writes, preview
 //! generation, export — runs here as a `Job`.
 

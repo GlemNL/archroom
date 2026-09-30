@@ -2,9 +2,9 @@
 //! §6.4/§6.5). Both return ordinary slider values the user keeps editing;
 //! neither is a hidden mode.
 
-use archroom_color::Mat3d;
-use archroom_color::temp::xy_to_temp_tint;
-use archroom_io::ImageF32;
+use viberoom_color::Mat3d;
+use viberoom_color::temp::xy_to_temp_tint;
+use viberoom_io::ImageF32;
 
 use crate::ops::{ProfileParams, ToneParams};
 use crate::rawprep::SceneColor;
@@ -38,7 +38,7 @@ pub fn downscale(image: &ImageF32, max_edge: u32, linearize: bool) -> Proxy {
                     for (c, a) in acc.iter_mut().enumerate() {
                         let v = image.data[i + c];
                         *a += f64::from(if linearize {
-                            archroom_color::srgb_eotf(v)
+                            viberoom_color::srgb_eotf(v)
                         } else {
                             v
                         });
@@ -173,9 +173,9 @@ pub fn auto_tone(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use archroom_color::cat::Cat;
-    use archroom_color::cie::{D65, SRGB};
-    use archroom_io::CameraColor;
+    use viberoom_color::cat::Cat;
+    use viberoom_color::cie::{D65, SRGB};
+    use viberoom_io::CameraColor;
 
     fn scene() -> SceneColor {
         SceneColor::new(&CameraColor {
@@ -222,7 +222,7 @@ mod tests {
         );
         let sc = scene();
         let (t, tint) = auto_wb(&pr, &sc).unwrap();
-        let xy = archroom_color::temp::temp_tint_to_xy(t, tint);
+        let xy = viberoom_color::temp::temp_tint_to_xy(t, tint);
         let m = sc.decoded_to_working(xy, Cat::Cat16);
         let out = m.mul_vec([0.26 * 1.3, 0.26, 0.26 * 0.7]);
         assert!(

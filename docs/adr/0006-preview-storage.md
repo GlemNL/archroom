@@ -13,7 +13,7 @@ preview folder is.
 ## Decision
 
 Rendered previews are JPEG files on disk, next to the catalog in
-`Archroom Previews/`, indexed by a small `previews.db` SQLite database for
+`Viberoom Previews/`, indexed by a small `previews.db` SQLite database for
 fast lookup by `(photo_id, level, params_hash)`.
 
 ## Consequences

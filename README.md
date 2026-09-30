@@ -1,6 +1,6 @@
 <div align="center">
 
-# Archroom
+# Viberoom
 
 **A Linux-native, non-destructive photo library and raw developer.**
 
@@ -16,7 +16,7 @@ Catalog thousands of photos, cull them from the keyboard, and develop raws on th
 </div>
 
 > [!NOTE]
-> Archroom is **pre-release (v0.1 in progress)**. Import, organizing, Develop and Export work. Expect rough edges: keep your originals backed up (Archroom never modifies them) and see [Status](#status).
+> Viberoom is **pre-release (v0.1 in progress)**. Import, organizing, Develop and Export work. Expect rough edges: keep your originals backed up (Viberoom never modifies them) and see [Status](#status).
 
 ## Screenshots
 
@@ -26,9 +26,9 @@ Catalog thousands of photos, cull them from the keyboard, and develop raws on th
 ![The Develop module: navigator, presets and history on the left, histogram and adjustment panels on the right](images/develop.png)
 *Develop: non-destructive raw editing with presets, history, histogram and the full set of panels.*
 
-## Why Archroom
+## Why Viberoom
 
-Linux has excellent raw tools, but few that pair a fast catalog with a develop workflow you already know. Archroom is a Library and Develop pair with a filmstrip, panels and sliders, driven from the keyboard.
+Linux has excellent raw tools, but few that pair a fast catalog with a develop workflow you already know. Viberoom is a Library and Develop pair with a filmstrip, panels and sliders, driven from the keyboard.
 
 If you've ever spent an evening in a well-known room full of light, your fingers will find their way around here: the panel order, the slider names and the shortcuts will feel familiar. Everything else is new, open source, and yours.
 
@@ -57,7 +57,7 @@ If you've ever spent an evening in a well-known room full of light, your fingers
 - File-name templates (`{filename}`, `{seq:4}`, `{date:%Y%m%d}`, `{title}`, `{custom}`), rename/overwrite/skip on conflict
 - Metadata: everything, copyright only, or none; optional location removal; keyword hierarchy
 - Presets, and a background batch with progress and cancel while you keep working
-- `archroom-cli export` does the same without the UI
+- `viberoom-cli export` does the same without the UI
 
 <p align="center">
   <img src="images/export.png" alt="The Export dialog: format, color space, resize, destination, file name template and metadata options" width="360">
@@ -100,7 +100,7 @@ If you've ever spent an evening in a well-known room full of light, your fingers
 
 ## Building
 
-Archroom is a Rust workspace. You need a recent stable Rust toolchain (1.85 or newer) and a few system libraries.
+Viberoom is a Rust workspace. You need a recent stable Rust toolchain (1.85 or newer) and a few system libraries.
 
 ### System dependencies
 
@@ -123,7 +123,7 @@ Other distributions need the equivalent development packages (for example `libra
 
 ### Install from a release
 
-Each [release](https://github.com/GlemNL/archroom/releases) ships:
+Each [release](https://github.com/GlemNL/viberoom/releases) ships:
 
 | Format | For |
 |---|---|
@@ -146,9 +146,9 @@ cd packaging && makepkg -si
 ### Run
 
 ```sh
-git clone https://github.com/GlemNL/archroom
-cd archroom
-cargo run --release -p archroom-app
+git clone https://github.com/GlemNL/viberoom
+cd viberoom
+cargo run --release -p viberoom-app
 ```
 
 If you have [`just`](https://github.com/casey/just), `just run` does the same.
@@ -165,20 +165,20 @@ just bless   # re-bless golden images after an intentional rendering change
 The workspace is split so that the engine, catalog, jobs and services crates never depend on the UI toolkit. A headless CLI uses them too:
 
 ```sh
-cargo run -p archroom-cli -- render --help
+cargo run -p viberoom-cli -- render --help
 ```
 
 ## Where things live
 
 | What | Where |
 |---|---|
-| Config | `~/.config/archroom/config.toml` |
-| Presets | `~/.local/share/archroom/presets/` |
-| Catalog | `~/Pictures/Archroom/Archroom.arcat` (SQLite) |
-| Previews | Next to the catalog, in `Archroom Previews/` (trimmed to the cache budget at startup) |
-| Backups | Next to the catalog, in `Archroom Backups/` (daily, newest few kept) |
-| Caches | `~/.cache/archroom/` (safe to delete) |
-| Logs | `~/.local/state/archroom/logs/` |
+| Config | `~/.config/viberoom/config.toml` |
+| Presets | `~/.local/share/viberoom/presets/` |
+| Catalog | `~/Pictures/Viberoom/Viberoom.arcat` (SQLite) |
+| Previews | Next to the catalog, in `Viberoom Previews/` (trimmed to the cache budget at startup) |
+| Backups | Next to the catalog, in `Viberoom Backups/` (daily, newest few kept) |
+| Caches | `~/.cache/viberoom/` (safe to delete) |
+| Logs | `~/.local/state/viberoom/logs/` |
 
 ## Architecture
 
@@ -196,8 +196,8 @@ crates/
   ui-kit/          shared egui widgets and theme
   module-library/  Library module
   module-develop/  Develop module
-  shell/, app/     window, module switcher, the `archroom` binary
-  cli/             headless `archroom-cli`
+  shell/, app/     window, module switcher, the `viberoom` binary
+  cli/             headless `viberoom-cli`
 ```
 
 Design decisions are recorded as ADRs in [`docs/adr/`](docs/adr), and the full plan is in [`PLAN.md`](PLAN.md).
@@ -225,6 +225,6 @@ Issues and pull requests are welcome. Please run `just lint` and `just test` bef
 
 ## License
 
-Archroom is licensed under the [GPL-3.0-or-later](LICENSE).
+Viberoom is licensed under the [GPL-3.0-or-later](LICENSE).
 
-Archroom is an independent project. It is not affiliated with or endorsed by Adobe. Lightroom is a trademark of Adobe Inc.
+Viberoom is an independent project. It is not affiliated with or endorsed by Adobe. Lightroom is a trademark of Adobe Inc.

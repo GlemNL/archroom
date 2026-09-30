@@ -5,7 +5,7 @@
 
 use std::collections::BTreeSet;
 
-use archroom_core::ids::{CollectionId, FolderId, ImportId, PhotoId};
+use viberoom_core::ids::{CollectionId, FolderId, ImportId, PhotoId};
 
 /// What the Grid/filmstrip are currently listing (plan §7.2's Catalog and
 /// Folders panels). Collections join once M2 builds them.

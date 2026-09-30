@@ -95,7 +95,7 @@ mod tests {
     #[test]
     fn create_or_open_creates_parent_dirs_and_migrates() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let path = dir.path().join("nested/Archroom.arcat");
+        let path = dir.path().join("nested/Viberoom.arcat");
 
         let catalog = Catalog::create_or_open(&path).expect("create");
         assert!(path.exists());
@@ -105,7 +105,7 @@ mod tests {
     #[test]
     fn reopening_an_existing_catalog_does_not_error() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let path = dir.path().join("Archroom.arcat");
+        let path = dir.path().join("Viberoom.arcat");
 
         Catalog::create_or_open(&path).expect("create");
         let reopened = Catalog::create_or_open(&path).expect("reopen");
@@ -115,8 +115,8 @@ mod tests {
     #[test]
     fn backup_to_produces_a_valid_copy() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let src_path = dir.path().join("Archroom.arcat");
-        let dest_path = dir.path().join("Backups/Archroom-backup.arcat");
+        let src_path = dir.path().join("Viberoom.arcat");
+        let dest_path = dir.path().join("Backups/Viberoom-backup.arcat");
 
         let catalog = Catalog::create_or_open(&src_path).expect("create");
         catalog.backup_to(&dest_path).expect("backup");

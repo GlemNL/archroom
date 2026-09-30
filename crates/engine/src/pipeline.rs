@@ -20,13 +20,13 @@
 
 use std::time::{Duration, Instant};
 
-use archroom_color::Mat3d;
-use archroom_color::cat::Cat;
-use archroom_color::cie::{REC2020, SRGB};
-use archroom_color::icc::{OutputSpace, build_display_lut};
-use archroom_color::oklab::rgb_to_lms;
-use archroom_color::temp::temp_tint_to_xy;
-use archroom_io::DecodedImage;
+use viberoom_color::Mat3d;
+use viberoom_color::cat::Cat;
+use viberoom_color::cie::{REC2020, SRGB};
+use viberoom_color::icc::{OutputSpace, build_display_lut};
+use viberoom_color::oklab::rgb_to_lms;
+use viberoom_color::temp::temp_tint_to_xy;
+use viberoom_io::DecodedImage;
 use wgpu::util::DeviceExt;
 use xxhash_rust::xxh3::xxh3_64;
 
@@ -603,7 +603,7 @@ impl Pipeline {
 
         let linearize = matches!(kind, SourceKind::Rendered);
         let table: Vec<f32> = (0..=4096)
-            .map(|i| archroom_color::srgb_eotf(i as f32 / 4096.0))
+            .map(|i| viberoom_color::srgb_eotf(i as f32 / 4096.0))
             .collect();
         let ch = rgb.channels.max(3) as usize;
         let px = (rgb.width as usize) * (rgb.height as usize);

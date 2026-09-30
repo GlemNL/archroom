@@ -6,8 +6,8 @@
 
 use std::time::{Duration, Instant};
 
-use archroom_catalog::Catalog;
-use archroom_catalog::repo::{
+use viberoom_catalog::Catalog;
+use viberoom_catalog::repo::{
     self, NewFile, NewPhoto, PhotoSort, list_all_photos, list_photos_for_folder,
 };
 

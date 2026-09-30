@@ -1,8 +1,8 @@
 //! The Presets panel (plan §8.1): built-in and user presets in folders;
 //! click applies, the context menu updates, renames, deletes and exports.
 
-use archroom_services::presets::{self, Preset};
-use archroom_shell::AppCx;
+use viberoom_services::presets::{self, Preset};
+use viberoom_shell::AppCx;
 
 use crate::DevelopModule;
 use crate::preset_dialog::PresetDialog;
@@ -139,7 +139,7 @@ fn perform(m: &mut DevelopModule, cx: &mut AppCx, act: Act) {
         Act::Export(i) => {
             let Some(p) = m.presets.get(i) else { return };
             if let Some(path) = rfd::FileDialog::new()
-                .add_filter("Archroom preset", &["arpreset"])
+                .add_filter("Viberoom preset", &["arpreset"])
                 .set_file_name(format!("{}.arpreset", p.name))
                 .save_file()
                 && let Err(e) = presets::export_file(p, &path)
@@ -149,7 +149,7 @@ fn perform(m: &mut DevelopModule, cx: &mut AppCx, act: Act) {
         }
         Act::Import => {
             let Some(path) = rfd::FileDialog::new()
-                .add_filter("Archroom preset", &["arpreset"])
+                .add_filter("Viberoom preset", &["arpreset"])
                 .pick_file()
             else {
                 return;

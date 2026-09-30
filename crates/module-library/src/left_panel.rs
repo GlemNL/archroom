@@ -6,9 +6,9 @@
 
 use std::collections::HashMap;
 
-use archroom_core::ids::FolderId;
-use archroom_services::repo::FolderRow;
-use archroom_shell::{AppCx, LibrarySource};
+use viberoom_core::ids::FolderId;
+use viberoom_services::repo::FolderRow;
+use viberoom_shell::{AppCx, LibrarySource};
 
 use crate::photos::LibraryData;
 

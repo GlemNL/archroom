@@ -5,8 +5,8 @@ use rayon::prelude::*;
 use std::ffi::CString;
 use std::path::Path;
 
-use archroom_color::Mat3;
-use archroom_core::{Error, Result};
+use viberoom_color::Mat3;
+use viberoom_core::{Error, Result};
 use libraw_sys as sys;
 
 use crate::types::{
@@ -359,9 +359,9 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "needs ARCHROOM_TEST_RAW pointing at a real raw file"]
+    #[ignore = "needs VIBEROOM_TEST_RAW pointing at a real raw file"]
     fn decodes_metadata_and_pixels_from_a_real_raw_file() {
-        let path = std::env::var("ARCHROOM_TEST_RAW").expect("set ARCHROOM_TEST_RAW");
+        let path = std::env::var("VIBEROOM_TEST_RAW").expect("set VIBEROOM_TEST_RAW");
         let path = Path::new(&path);
         let d = RawDecoder;
 

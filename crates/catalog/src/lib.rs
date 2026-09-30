@@ -1,4 +1,4 @@
-//! `archroom-catalog`: the SQLite-backed catalog (plan §5). M0 covers
+//! `viberoom-catalog`: the SQLite-backed catalog (plan §5). M0 covers
 //! create/open, migrations, WAL and online backup; row-level queries and the
 //! `Criterion` filter registry land in M1/M2.
 

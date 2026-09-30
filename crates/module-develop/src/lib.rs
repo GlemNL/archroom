@@ -1,4 +1,4 @@
-//! `archroom-module-develop`: the Develop module (plan §8). One open photo
+//! `viberoom-module-develop`: the Develop module (plan §8). One open photo
 //! at a time: the engine renders it on a worker thread (`Session`), the
 //! canvas draws the resulting texture, and edits are persisted through
 //! `services::develop` as coalesced history steps.
@@ -18,17 +18,17 @@ mod presets_panel;
 
 use std::time::{Duration, Instant};
 
-use archroom_core::ids::PhotoId;
-use archroom_services::catalog_develop::{HistoryRow, SnapshotRow};
-use archroom_services::engine::ops::{Profile, Treatment, default_registry};
-use archroom_services::engine::pipeline::{Histogram, RenderRequest};
-use archroom_services::engine::{EditParams, Orientation, Registry};
-use archroom_services::presets::Preset;
-use archroom_services::repo::{self, PhotoFileInfo};
-use archroom_services::rerender::RerenderPreviewsJob;
-use archroom_services::session::{Session, open_in_background};
-use archroom_services::{catalog_develop, develop};
-use archroom_shell::{AppCx, Module, ModuleId};
+use viberoom_core::ids::PhotoId;
+use viberoom_services::catalog_develop::{HistoryRow, SnapshotRow};
+use viberoom_services::engine::ops::{Profile, Treatment, default_registry};
+use viberoom_services::engine::pipeline::{Histogram, RenderRequest};
+use viberoom_services::engine::{EditParams, Orientation, Registry};
+use viberoom_services::presets::Preset;
+use viberoom_services::repo::{self, PhotoFileInfo};
+use viberoom_services::rerender::RerenderPreviewsJob;
+use viberoom_services::session::{Session, open_in_background};
+use viberoom_services::{catalog_develop, develop};
+use viberoom_shell::{AppCx, Module, ModuleId};
 use crossbeam_channel::Receiver;
 
 /// Slider drags on one control become a history step this long after the
@@ -81,7 +81,7 @@ struct Doc {
 #[derive(Debug)]
 struct Clipboard {
     source: EditParams,
-    groups: Vec<archroom_services::engine::SettingsGroup>,
+    groups: Vec<viberoom_services::engine::SettingsGroup>,
 }
 
 /// Where the canvas and image were drawn last frame (for the Navigator).
@@ -120,7 +120,7 @@ pub struct DevelopModule {
     copy_dialog: Option<copy_dialog::CopyDialog>,
     previous: Option<PhotoId>,
     last_pass: u64,
-    /// Dev/test hook: `ARCHROOM_START_TOOL=crop` opens the crop tool as
+    /// Dev/test hook: `VIBEROOM_START_TOOL=crop` opens the crop tool as
     /// soon as the first photo has loaded.
     start_crop_tool: bool,
 }
@@ -150,7 +150,7 @@ impl DevelopModule {
             copy_dialog: None,
             previous: None,
             last_pass: u64::MAX,
-            start_crop_tool: std::env::var("ARCHROOM_START_TOOL").is_ok_and(|v| v == "crop"),
+            start_crop_tool: std::env::var("VIBEROOM_START_TOOL").is_ok_and(|v| v == "crop"),
         }
     }
 
@@ -443,7 +443,7 @@ impl DevelopModule {
         &mut self,
         cx: &mut AppCx,
         source: &EditParams,
-        groups: &[archroom_services::engine::SettingsGroup],
+        groups: &[viberoom_services::engine::SettingsGroup],
         label: &str,
         include_active: bool,
     ) {
@@ -493,9 +493,9 @@ impl DevelopModule {
             .filter(|g| {
                 !matches!(
                     g,
-                    archroom_services::engine::SettingsGroup::Crop
-                        | archroom_services::engine::SettingsGroup::Straighten
-                        | archroom_services::engine::SettingsGroup::ProcessVersion
+                    viberoom_services::engine::SettingsGroup::Crop
+                        | viberoom_services::engine::SettingsGroup::Straighten
+                        | viberoom_services::engine::SettingsGroup::ProcessVersion
                 )
             })
             .collect();
@@ -507,7 +507,7 @@ impl DevelopModule {
     fn sync_selected(
         &mut self,
         cx: &mut AppCx,
-        groups: &[archroom_services::engine::SettingsGroup],
+        groups: &[viberoom_services::engine::SettingsGroup],
     ) {
         self.flush(cx);
         let Some(doc) = &self.doc else { return };
@@ -567,21 +567,21 @@ impl DevelopModule {
 
     fn reload_presets(&mut self, cx: &AppCx) {
         if let Some(catalog) = &cx.catalog {
-            self.presets = archroom_services::presets::list_all(catalog.connection())
-                .unwrap_or_else(|_| archroom_services::presets::builtins());
+            self.presets = viberoom_services::presets::list_all(catalog.connection())
+                .unwrap_or_else(|_| viberoom_services::presets::builtins());
         }
         self.presets_loaded = true;
     }
 
     /// Makes a virtual copy of the active photo and opens it (plan §7.4).
     fn virtual_copy(&mut self, cx: &mut AppCx) {
-        use archroom_services::command::CreateVirtualCopies;
+        use viberoom_services::command::CreateVirtualCopies;
         self.flush(cx);
         let Some(photo) = self.doc.as_ref().map(|d| d.photo) else {
             return;
         };
         match cx.apply_command_event(Box::new(CreateVirtualCopies::new(vec![photo]))) {
-            Ok(Some(archroom_core::events::CatalogEvent::PhotosAdded { ids, .. })) => {
+            Ok(Some(viberoom_core::events::CatalogEvent::PhotosAdded { ids, .. })) => {
                 if let Some(&copy) = ids.first() {
                     cx.selection.select_single(copy);
                 }
@@ -628,7 +628,7 @@ impl DevelopModule {
     }
 
     fn auto_tone(&mut self, cx: &mut AppCx) {
-        use archroom_services::engine::ops::{Exposure, ExposureParams, Tone};
+        use viberoom_services::engine::ops::{Exposure, ExposureParams, Tone};
         let Some(doc) = &self.doc else { return };
         let Some(session) = &doc.session else { return };
         let mut params = doc.params.clone();
@@ -647,7 +647,7 @@ impl DevelopModule {
     }
 
     fn auto_wb(&mut self, cx: &mut AppCx) {
-        use archroom_services::engine::ops::WhiteBalance;
+        use viberoom_services::engine::ops::WhiteBalance;
         let Some(doc) = &self.doc else { return };
         let Some(session) = &doc.session else { return };
         let mut params = doc.params.clone();
@@ -752,7 +752,7 @@ impl Module for DevelopModule {
                 let mut tool_done = false;
                 if let Some(mut tool) = self.crop_tool.take() {
                     if let Some(session) = &doc.session {
-                        let canvas = archroom_services::engine::geometry::resolve(
+                        let canvas = viberoom_services::engine::geometry::resolve(
                             session.source_size,
                             session.orientation,
                             &doc.params,

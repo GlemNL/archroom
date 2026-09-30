@@ -2,9 +2,9 @@
 //! matrices, unit D65 multipliers), so expected values can be computed by
 //! hand; tests skip quietly when no Vulkan adapter is available.
 
-use archroom_color::cie::SRGB;
-use archroom_color::srgb_oetf;
-use archroom_io::{CameraColor, DecodedImage, ImageF32};
+use viberoom_color::cie::SRGB;
+use viberoom_color::srgb_oetf;
+use viberoom_io::{CameraColor, DecodedImage, ImageF32};
 
 use crate::Orientation;
 use crate::gpu::GpuContext;
@@ -789,7 +789,7 @@ fn geometry_changes_rerun_the_pipeline_but_defaults_stay_pixel_identical() {
 
 #[test]
 fn sixteen_bit_output_matches_eight_bit_and_space_changes_encoding() {
-    use archroom_color::icc::OutputSpace;
+    use viberoom_color::icc::OutputSpace;
     let Some(g) = gpu() else { return };
     let img = raw(
         16,

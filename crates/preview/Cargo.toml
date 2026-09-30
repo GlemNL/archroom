@@ -1,5 +1,5 @@
 [package]
-name = "archroom-preview"
+name = "viberoom-preview"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,10 +9,10 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-archroom-core = { workspace = true }
-archroom-catalog = { workspace = true }
-archroom-engine = { workspace = true }
-archroom-io = { workspace = true }
+viberoom-core = { workspace = true }
+viberoom-catalog = { workspace = true }
+viberoom-engine = { workspace = true }
+viberoom-io = { workspace = true }
 rusqlite = { workspace = true }
 fast_image_resize = { version = "6", features = ["image"] }
 image = { version = "0.25", default-features = false, features = ["jpeg"] }

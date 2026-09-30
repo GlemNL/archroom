@@ -1,5 +1,5 @@
 [package]
-name = "archroom-color"
+name = "viberoom-color"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,7 +9,7 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-archroom-core = { workspace = true }
+viberoom-core = { workspace = true }
 thiserror = { workspace = true }
 lcms2 = "6.1"
 serde = { workspace = true }

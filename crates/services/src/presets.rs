@@ -4,14 +4,14 @@
 
 use std::path::Path;
 
-use archroom_catalog::presets as store;
-use archroom_engine::ops::{
+use viberoom_catalog::presets as store;
+use viberoom_engine::ops::{
     BwMix, BwMixParams, Clarity, ClarityParams, Exposure, ExposureParams, Hsl, HslParams, Noise,
     NoiseParams, Presence, PresenceParams, Profile, ProfileName, ProfileParams, Sharpen,
     SharpenParams, Tone, ToneCurve, ToneCurveParams, ToneParams, Treatment, Vignette,
     VignetteParams, WbMode, WhiteBalance, WhiteBalanceParams, default_registry,
 };
-use archroom_engine::{EditParams, SettingsGroup};
+use viberoom_engine::{EditParams, SettingsGroup};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
@@ -19,7 +19,7 @@ use crate::develop::paste_groups;
 use crate::error::{Error, Result};
 
 pub const USER_FOLDER: &str = "User Presets";
-pub const BUILTIN_FOLDER: &str = "Archroom";
+pub const BUILTIN_FOLDER: &str = "Viberoom";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Preset {
@@ -277,7 +277,7 @@ pub fn delete_user(conn: &Connection, id: i64) -> Result<()> {
 /// The `.arpreset` file format.
 #[derive(Debug, Serialize, Deserialize)]
 struct PresetFile {
-    archroom_preset: u32,
+    viberoom_preset: u32,
     name: String,
     groups: Vec<SettingsGroup>,
     params: serde_json::Value,
@@ -285,7 +285,7 @@ struct PresetFile {
 
 pub fn export_file(preset: &Preset, path: &Path) -> Result<()> {
     let file = PresetFile {
-        archroom_preset: 1,
+        viberoom_preset: 1,
         name: preset.name.clone(),
         groups: preset.groups.clone(),
         params: serde_json::to_value(&preset.params).map_err(|e| Error::Other(e.to_string()))?,
@@ -298,11 +298,11 @@ pub fn import_file(path: &Path) -> Result<Preset> {
     let text = std::fs::read_to_string(path).map_err(|e| Error::io(path, e))?;
     let file: PresetFile = serde_json::from_str(&text)
         .map_err(|e| Error::Other(format!("{}: not a preset file ({e})", path.display())))?;
-    if file.archroom_preset != 1 {
+    if file.viberoom_preset != 1 {
         return Err(Error::Other(format!(
             "{}: unsupported preset version {}",
             path.display(),
-            file.archroom_preset
+            file.viberoom_preset
         )));
     }
     let params = EditParams::from_json(&file.params.to_string())
@@ -321,7 +321,7 @@ pub fn import_file(path: &Path) -> Result<Preset> {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use archroom_catalog::Catalog;
+    use viberoom_catalog::Catalog;
 
     #[test]
     fn built_ins_are_non_empty_distinct_and_never_touch_per_photo_groups() {
@@ -439,7 +439,7 @@ mod tests {
         assert!(import_file(&bad).is_err());
         std::fs::write(
             &bad,
-            "{\"archroom_preset\":9,\"name\":\"x\",\"groups\":[],\"params\":{}}",
+            "{\"viberoom_preset\":9,\"name\":\"x\",\"groups\":[],\"params\":{}}",
         )
         .unwrap();
         assert!(import_file(&bad).is_err());

@@ -1,8 +1,8 @@
 //! The New Preset… and Rename dialogs (plan §8.1).
 
-use archroom_services::engine::SettingsGroup;
-use archroom_services::presets::{self, USER_FOLDER};
-use archroom_shell::AppCx;
+use viberoom_services::engine::SettingsGroup;
+use viberoom_services::presets::{self, USER_FOLDER};
+use viberoom_shell::AppCx;
 
 use crate::DevelopModule;
 use crate::copy_dialog::{group_checkboxes, group_list};

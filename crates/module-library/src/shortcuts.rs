@@ -4,11 +4,11 @@
 //! Ctrl+Z/Ctrl+Y are handled globally in `app` instead, since they're
 //! meaningful outside Library too in principle.
 
-use archroom_core::ids::PhotoId;
-use archroom_services::command::{
+use viberoom_core::ids::PhotoId;
+use viberoom_services::command::{
     CreateVirtualCopies, RotatePhotos, SetColorLabel, SetFlag, SetRating,
 };
-use archroom_shell::AppCx;
+use viberoom_shell::AppCx;
 
 use crate::grid::color_label_swatch;
 
@@ -150,7 +150,7 @@ pub fn create_virtual_copies(cx: &mut AppCx) {
         return;
     }
     match cx.apply_command_event(Box::new(CreateVirtualCopies::new(ids))) {
-        Ok(Some(archroom_core::events::CatalogEvent::PhotosAdded { ids, .. })) => {
+        Ok(Some(viberoom_core::events::CatalogEvent::PhotosAdded { ids, .. })) => {
             if let Some((first, rest)) = ids.split_first() {
                 cx.selection.select_single(*first);
                 for id in rest {

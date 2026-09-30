@@ -1,8 +1,8 @@
 //! The Develop filmstrip (plan §7.3, shared with Library): the photos the
 //! Library is listing, on the shared selection.
 
-use archroom_core::ids::PhotoId;
-use archroom_shell::AppCx;
+use viberoom_core::ids::PhotoId;
+use viberoom_shell::AppCx;
 
 const THUMB: f32 = 64.0;
 
@@ -18,7 +18,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut AppCx) {
     let last: Option<i64> = ui.data(|d| d.get_temp(key));
     let now = cx.selection.active.map(PhotoId::get);
     let scroll_to_active = now != last;
-    archroom_shell::wheel_scrolls_horizontally(ui);
+    viberoom_shell::wheel_scrolls_horizontally(ui);
     egui::ScrollArea::horizontal()
         .auto_shrink([false, false])
         .show(ui, |ui| {
@@ -57,14 +57,14 @@ fn thumb(
         painter.rect_filled(
             rect,
             egui::CornerRadius::same(2),
-            archroom_ui::ACCENT.linear_multiply(0.25),
+            viberoom_ui::ACCENT.linear_multiply(0.25),
         );
     }
     let inner = rect.shrink(2.0);
     let path = cx
         .previews
         .as_ref()
-        .and_then(|p| p.lookup(id, archroom_services::LEVEL_L1).ok().flatten());
+        .and_then(|p| p.lookup(id, viberoom_services::LEVEL_L1).ok().flatten());
     match path {
         Some(path) => {
             ui.put(
@@ -86,7 +86,7 @@ fn thumb(
         painter.rect_stroke(
             rect,
             egui::CornerRadius::same(2),
-            egui::Stroke::new(2.0_f32, archroom_ui::ACCENT),
+            egui::Stroke::new(2.0_f32, viberoom_ui::ACCENT),
             egui::StrokeKind::Inside,
         );
     }

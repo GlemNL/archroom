@@ -1,12 +1,12 @@
 //! The `previews.db` index plus the JPEG files it points at (plan §5.4,
-//! §4.7, decision D6): stored next to the catalog in `Archroom Previews/`
+//! §4.7, decision D6): stored next to the catalog in `Viberoom Previews/`
 //! so the catalog stays portable, but as a separate SQLite file from the
 //! catalog itself, since preview *files* are disposable and shouldn't share
 //! a WAL/transaction log with catalog data that isn't.
 
 use std::path::{Path, PathBuf};
 
-use archroom_core::ids::PhotoId;
+use viberoom_core::ids::PhotoId;
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::error::{Error, Result};
@@ -35,10 +35,10 @@ impl std::fmt::Debug for PreviewCache {
 
 impl PreviewCache {
     /// `catalog_path` is the `.arcat` file; the cache lives in
-    /// `Archroom Previews/` next to it.
+    /// `Viberoom Previews/` next to it.
     pub fn open_for_catalog(catalog_path: &Path) -> Result<Self> {
         let base = catalog_path.parent().unwrap_or_else(|| Path::new("."));
-        Self::open_at(&base.join("Archroom Previews"))
+        Self::open_at(&base.join("Viberoom Previews"))
     }
 
     pub fn open_at(dir: &Path) -> Result<Self> {
@@ -82,7 +82,7 @@ impl PreviewCache {
         let filename = format!("{}_{level}_{:016x}.jpg", photo_id.get(), params_hash as u64);
         let path = self.dir.join(&filename);
         let previous = self.lookup(photo_id, level)?;
-        archroom_core::fsutil::write_atomic(&path, jpeg_bytes)?;
+        viberoom_core::fsutil::write_atomic(&path, jpeg_bytes)?;
         if let Some(old) = previous
             && old != path
         {

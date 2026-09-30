@@ -4,10 +4,10 @@
 
 use std::collections::BTreeSet;
 
-use archroom_core::events::CatalogEvent;
-use archroom_services::collections::{self, CollectionRow, PhotoSource};
-use archroom_services::repo::{self, FolderRow, PhotoSort, PhotoSummary};
-use archroom_shell::{AppCx, LibrarySource};
+use viberoom_core::events::CatalogEvent;
+use viberoom_services::collections::{self, CollectionRow, PhotoSource};
+use viberoom_services::repo::{self, FolderRow, PhotoSort, PhotoSummary};
+use viberoom_shell::{AppCx, LibrarySource};
 use crossbeam_channel::Receiver;
 
 use crate::filter_bar::FilterState;
@@ -21,7 +21,7 @@ pub struct LibraryData {
     pub collections: Vec<CollectionRow>,
     pub filter: FilterState,
     last_filter: Option<FilterState>,
-    pub latest_import: Option<archroom_core::ids::ImportId>,
+    pub latest_import: Option<viberoom_core::ids::ImportId>,
     pub total_photo_count: i64,
     pub sort: PhotoSort,
     /// Bumped every time a drained `CatalogEvent` was a `PhotosChanged`:
@@ -109,7 +109,7 @@ impl LibraryData {
         cx.selection.retain(&still_present);
     }
 
-    pub fn ordered_ids(&self) -> Vec<archroom_core::ids::PhotoId> {
+    pub fn ordered_ids(&self) -> Vec<viberoom_core::ids::PhotoId> {
         self.photos.iter().map(|p| p.photo_id).collect()
     }
 }

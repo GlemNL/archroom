@@ -4,9 +4,9 @@
 //! only the Library one). Not persisted across restarts, matching
 //! Lightroom.
 
-use archroom_catalog::Result;
-use archroom_catalog::command::Command;
-use archroom_core::events::CatalogEvent;
+use viberoom_catalog::Result;
+use viberoom_catalog::command::Command;
+use viberoom_core::events::CatalogEvent;
 use rusqlite::Connection;
 
 #[derive(Default)]
@@ -80,11 +80,11 @@ impl UndoStack {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use archroom_catalog::Catalog;
-    use archroom_catalog::command::SetRating;
-    use archroom_catalog::repo::{self, NewFile, NewPhoto};
+    use viberoom_catalog::Catalog;
+    use viberoom_catalog::command::SetRating;
+    use viberoom_catalog::repo::{self, NewFile, NewPhoto};
 
-    fn seed_photo(conn: &Connection) -> archroom_core::ids::PhotoId {
+    fn seed_photo(conn: &Connection) -> viberoom_core::ids::PhotoId {
         let folder = repo::upsert_folder_path(conn, std::path::Path::new("/a")).unwrap();
         let file_id = repo::insert_file(
             conn,
@@ -107,7 +107,7 @@ mod tests {
         .unwrap()
     }
 
-    fn rating_of(conn: &Connection, id: archroom_core::ids::PhotoId) -> i32 {
+    fn rating_of(conn: &Connection, id: viberoom_core::ids::PhotoId) -> i32 {
         conn.query_row("SELECT rating FROM photos WHERE id = ?1", [id.get()], |r| {
             r.get(0)
         })

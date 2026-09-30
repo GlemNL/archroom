@@ -1,4 +1,4 @@
-//! `archroom-preview`: thumbnail and preview generation and cache (plan
+//! `viberoom-preview`: thumbnail and preview generation and cache (plan
 //! §5.4). Phase A (M1 plan roadmap) covers the `previews.db` index and L1
 //! generation; L2/L3 and GPU-rendered previews follow once the Develop
 //! engine (M3) exists to render them from.

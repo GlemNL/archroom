@@ -5,7 +5,7 @@
 
 ## Context
 
-Archroom links against `exiv2` (GPL-2.0-or-later) for metadata read/write
+Viberoom links against `exiv2` (GPL-2.0-or-later) for metadata read/write
 and LibRaw (dual LGPL-2.1/CDDL) for raw decoding. The license needs to be
 compatible with both, and the project wants to keep downstream forks and
 improvements open.

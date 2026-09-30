@@ -25,8 +25,8 @@ impl Error {
     }
 }
 
-impl From<archroom_core::Error> for Error {
-    fn from(e: archroom_core::Error) -> Self {
+impl From<viberoom_core::Error> for Error {
+    fn from(e: viberoom_core::Error) -> Self {
         Self::Other(e.to_string())
     }
 }

@@ -3,12 +3,12 @@
 //! `Command`s; creating/renaming/deleting a collection is direct catalog
 //! housekeeping (like Lightroom, not on the undo stack).
 
-use archroom_core::events::CatalogEvent;
-use archroom_core::ids::CollectionId;
-use archroom_services::collections::{self, CollectionKind, CollectionRow};
-use archroom_services::command::{AddToCollection, RemoveFromCollection};
-use archroom_services::criteria::SmartRules;
-use archroom_shell::{AppCx, LibrarySource};
+use viberoom_core::events::CatalogEvent;
+use viberoom_core::ids::CollectionId;
+use viberoom_services::collections::{self, CollectionKind, CollectionRow};
+use viberoom_services::command::{AddToCollection, RemoveFromCollection};
+use viberoom_services::criteria::SmartRules;
+use viberoom_shell::{AppCx, LibrarySource};
 
 use crate::filter_bar;
 use crate::photos::LibraryData;

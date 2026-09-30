@@ -7,11 +7,11 @@ use tracing_subscriber::EnvFilter;
 
 use crate::error::{Error, Result};
 
-/// `~/.local/state/archroom/logs/` (plan §4.7). File logging (rolled by
+/// `~/.local/state/viberoom/logs/` (plan §4.7). File logging (rolled by
 /// day) is wired up once a binary needs it; for now this just gives callers
 /// a stable path to create.
 pub fn log_dir() -> Result<PathBuf> {
-    let dirs = directories::ProjectDirs::from("", "", "archroom")
+    let dirs = directories::ProjectDirs::from("", "", "viberoom")
         .ok_or_else(|| Error::Settings("no home directory".into()))?;
     // `directories` maps `state_dir()` to `~/.local/state/<app>` on Linux;
     // it's `None` on platforms without a distinct state dir (macOS, Windows).

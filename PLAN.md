@@ -1,4 +1,4 @@
-# Archroom: MVP Plan
+# Viberoom: MVP Plan
 
 *A Linux-native, non-destructive photo library and raw developer, modeled on Lightroom Classic's **Library** and **Develop** modules.*
 
@@ -112,23 +112,23 @@ Status: Draft 2 · 2026-09-28 · Decisions D1–D9 accepted (§15)
 ### 4.2 Workspace layout
 
 ```
-archroom/
+viberoom/
 ├─ Cargo.toml               # [workspace]: shared deps, lints, profiles
 ├─ crates/
-│  ├─ core/                 # archroom-core: ids, types, settings, events, errors
-│  ├─ color/                # archroom-color: color math, CAT, temp/tint, lcms2 wrapper
+│  ├─ core/                 # viberoom-core: ids, types, settings, events, errors
+│  ├─ color/                # viberoom-color: color math, CAT, temp/tint, lcms2 wrapper
 │  ├─ libraw-sys/           # bindgen FFI to the system LibRaw
-│  ├─ io/                   # archroom-io: decoders, metadata, encoders
-│  ├─ catalog/              # archroom-catalog: schema, migrations, queries, criteria
-│  ├─ jobs/                 # archroom-jobs: scheduler, priorities, cancellation
-│  ├─ engine/               # archroom-engine: ops, pipeline, GPU; ops/*.rs + ops/*.wgsl
-│  ├─ preview/              # archroom-preview: thumbnail/preview generation & cache
-│  ├─ services/             # archroom-services: import, export, sidecars, analysis
-│  ├─ ui-kit/               # archroom-ui: reusable egui widgets and theme
+│  ├─ io/                   # viberoom-io: decoders, metadata, encoders
+│  ├─ catalog/              # viberoom-catalog: schema, migrations, queries, criteria
+│  ├─ jobs/                 # viberoom-jobs: scheduler, priorities, cancellation
+│  ├─ engine/               # viberoom-engine: ops, pipeline, GPU; ops/*.rs + ops/*.wgsl
+│  ├─ preview/              # viberoom-preview: thumbnail/preview generation & cache
+│  ├─ services/             # viberoom-services: import, export, sidecars, analysis
+│  ├─ ui-kit/               # viberoom-ui: reusable egui widgets and theme
 │  ├─ module-library/
 │  ├─ module-develop/
-│  ├─ app/                  # the `archroom` binary
-│  └─ cli/                  # the `archroom-cli` binary
+│  ├─ app/                  # the `viberoom` binary
+│  └─ cli/                  # the `viberoom-cli` binary
 ├─ assets/                  # icons, fonts, built-in presets, profiles
 ├─ tests/fixtures/          # small images; the big raw set is downloaded by a script
 ├─ docs/adr/                # architecture decision records
@@ -246,13 +246,13 @@ Job priorities run `Interactive > Visible (on-screen thumbnails, loupe) > UserBa
 
 | What | Where |
 |---|---|
-| Config | `~/.config/archroom/config.toml` |
-| User presets | `~/.local/share/archroom/presets/**/*.json` (one file per preset, so they can be shared) |
-| Catalog | User-chosen. Default: `~/Pictures/Archroom/Archroom.arcat` (SQLite). One catalog is open at a time (D7); "Open Catalog…" to switch is MVP+. |
-| Rendered previews | Next to the catalog in `Archroom Previews/` (JPEG files plus a `previews.db` index, D6), so the catalog stays portable like Lightroom's |
-| Volatile caches (1:1 previews) | `~/.cache/archroom/`, size-capped and safe to purge |
-| Logs | `~/.local/state/archroom/logs/` |
-| Catalog backups | `~/Pictures/Archroom/Backups/` via the SQLite online-backup API, on a schedule or at exit |
+| Config | `~/.config/viberoom/config.toml` |
+| User presets | `~/.local/share/viberoom/presets/**/*.json` (one file per preset, so they can be shared) |
+| Catalog | User-chosen. Default: `~/Pictures/Viberoom/Viberoom.arcat` (SQLite). One catalog is open at a time (D7); "Open Catalog…" to switch is MVP+. |
+| Rendered previews | Next to the catalog in `Viberoom Previews/` (JPEG files plus a `previews.db` index, D6), so the catalog stays portable like Lightroom's |
+| Volatile caches (1:1 previews) | `~/.cache/viberoom/`, size-capped and safe to purge |
+| Logs | `~/.local/state/viberoom/logs/` |
+| Catalog backups | `~/Pictures/Viberoom/Backups/` via the SQLite online-backup API, on a schedule or at exit |
 
 ---
 
@@ -360,8 +360,8 @@ Indexes cover `capture_time`, `rating`, `flag`, `color_label`, `folder_id`, `cam
 | Keywords, hierarchical | `lr:hierarchicalSubject` (e.g. Places > France > Paris, stored pipe-separated) |
 | Title / caption | `dc:title` / `dc:description` |
 | Creator / copyright | `dc:creator` / `dc:rights` |
-| Pick flag | `archroom:Flag` |
-| Develop settings (optional) | `archroom:DevelopSettings` (JSON) + `archroom:ProcessVersion` |
+| Pick flag | `viberoom:Flag` |
+| Develop settings (optional) | `viberoom:DevelopSettings` (JSON) + `viberoom:ProcessVersion` |
 
 - Writes are read-modify-write through exiv2, so fields written by other apps (Adobe `crs:`, darktable history) are preserved.
 - Naming follows Adobe (D5): `IMG_0001.xmp`. When a RAW+JPEG pair shares a basename, the name falls back to `IMG_0001.CR3.xmp`. Both are configurable.
@@ -376,7 +376,7 @@ Indexes cover `capture_time`, `rating`, `flag`, `color_label`, `folder_id`, `cam
 | L0 embedded | JPEG inside the raw (LibRaw `unpack_thumb`), or the JPEG itself | As-is | Not stored; used to generate L1 | First paint right after import |
 | L1 thumbnail | L0, or L2 downscaled | 320 px long edge (640 on HiDPI) | JPEG files + `previews.db` index | Grid, filmstrip |
 | L2 standard | Full pipeline with current settings | Configurable, default 2048 px | JPEG q90 files + index | Loupe, compare, Develop placeholder while decoding |
-| L3 1:1 | Full-resolution render | Full size | `~/.cache/archroom`, LRU budget (e.g. 5 GB) | Loupe zoom (MVP+) |
+| L3 1:1 | Full-resolution render | Full size | `~/.cache/viberoom`, LRU budget (e.g. 5 GB) | Loupe zoom (MVP+) |
 
 - Previews are keyed by `(photo_id, level, params_hash)`. A params change marks L1/L2 stale, and a background re-render follows, visible photos first.
 - The option "keep embedded previews until edited" defaults to on. Import stays fast, and the camera's look remains until the photo is touched.
@@ -655,7 +655,7 @@ Lightroom's local adjustments are a subset of the global adjustments applied thr
 | Sync settings | Apply the active photo's settings to the selection, with group checkboxes. Auto Sync is MVP+. | MVP / MVP+ |
 | Virtual copies | Shared with Library | MVP |
 | Auto Tone / Auto WB | `Ctrl+U` / `Ctrl+Shift+U` | MVP |
-| Develop settings in XMP | Optional, via the `archroom:` namespace | MVP+ |
+| Develop settings in XMP | Optional, via the `viberoom:` namespace | MVP+ |
 | Edit in an external editor (GIMP, Krita) | Export a TIFF, open the editor, re-import the result | Later |
 
 ---
@@ -687,7 +687,7 @@ Library:
 
 ```
 +----------------------------------------------------------------------------------------+
-| Archroom                                    [ Library ]   Develop         (2 jobs)     |
+| Viberoom                                    [ Library ]   Develop         (2 jobs)     |
 +--------------------+----------------------------------------------+--------------------+
 | > Navigator        | Text [_____]  Rating >= ***  Flag P  Meta v  | v Histogram        |
 | v Catalog          | +------+ +------+ +------+ +------+ +------+ |   [ histogram ]    |
@@ -714,14 +714,14 @@ Develop:
 
 ```
 +----------------------------------------------------------------------------------------+
-| Archroom                                      Library   [ Develop ]       (1 job)      |
+| Viberoom                                      Library   [ Develop ]       (1 job)      |
 +--------------------+--------------------------------------+----------------------------+
 | v Navigator        |                                      | v Histogram                |
 |   [ mini view ]    |                                      |   [ histogram ]  ^      ^  |
 |   Fit Fill 1:1 2:1 |                                      |   ISO 400  35mm  f/1.8     |
 | v Presets          |                                      | [Crop] [Spot] [Mask]       |
-|   > Archroom B&W   |                                      | v Basic                    |
-|   > Archroom Color |                                      |   Treatment  Color | B&W   |
+|   > Viberoom B&W   |                                      | v Basic                    |
+|   > Viberoom Color |                                      |   Treatment  Color | B&W   |
 |   > User Presets   |     (image canvas: zoom/pan,         |   Profile    Standard v    |
 | v Snapshots        |      crop & tool overlays,           |   WB  As Shot v      [W]   |
 |   Final v1         |      before/after split)             |   Temp      ---o---  5230  |
@@ -809,7 +809,7 @@ M0 ──┬── M1 Import & browse ── M2 Organize ───────�
 Prove the stack end to end and lay down the skeleton.
 - [x] `git init`; workspace; crate skeletons; shared lints; `justfile` (`run`, `test`, `lint`, `bench`, `fixtures`, `bless`); `cargo deny` config; `xtask` dependency-rule check — `fixtures`/`bless` are intentional `TODO(M3)` stubs (golden-image infra doesn't exist yet); `cargo-deny` itself isn't installed in this environment, so `deny.toml` is written but unrun
 - [x] `LICENSE` (GPL-3.0-or-later); record D1–D9 as ADRs in `docs/adr/`
-- [x] **Spike:** decode a NEF with LibRaw → linear f32 → wgpu upload → WGSL exposure and sRGB output → shown in an egui paint callback with a live slider (`archroom-app`'s "Spike (M0)" window, `crates/engine/src/spike.rs` + `crates/io/src/libraw_spike.rs`). Measured on the RX 7900 (RADV NAVI31): a 24.5 MP NEF decodes in ~1.1 s and each slider-driven re-render (submit + GPU wait) is sub-1 ms, well within the §12 budget. **Not yet done:** CR3 and RAF samples (only a NEF was on hand), and the UHD 630 measurement. This validates D1.
+- [x] **Spike:** decode a NEF with LibRaw → linear f32 → wgpu upload → WGSL exposure and sRGB output → shown in an egui paint callback with a live slider (`viberoom-app`'s "Spike (M0)" window, `crates/engine/src/spike.rs` + `crates/io/src/libraw_spike.rs`). Measured on the RX 7900 (RADV NAVI31): a 24.5 MP NEF decodes in ~1.1 s and each slider-driven re-render (submit + GPU wait) is sub-1 ms, well within the §12 budget. **Not yet done:** CR3 and RAF samples (only a NEF was on hand), and the UHD 630 measurement. This validates D1.
 - [ ] Check exiv2 reads CR3 on Arch — no CR3 sample on hand to test with; install `libgexiv2`, `vulkan-intel` and `vulkan-swrast` — done
 - [x] `core`: IDs, errors, settings (TOML + XDG), tracing, event bus
 - [x] `catalog`: create/open, migration v1, WAL, online backup
@@ -823,9 +823,9 @@ Prove the stack end to end and lay down the skeleton.
 
 - [x] `libraw-sys` plus a safe wrapper: open, metadata, embedded thumbnail, process — `crates/io/src/libraw.rs`, the `RawDecoder` `Decoder` impl. Sensor-native pixel output (`user_flip = 0`) so decoded dims always agree with catalogued `width`/`height`; rotation is applied later as a display-time transform via `orientation`, not baked into the pixels — that transform now exists for the Library surfaces (see M2 Phase B's note on `orientation_angle`); the full Develop-grade GPU warp pass is still §6.8's M4 work.
 - [x] Metadata through exiv2 (`rexiv2`) normalized into `ImageMetadata`; orientation handling — `crates/io/src/metadata.rs` for JPEG/PNG/TIFF. Raws read their own metadata straight from LibRaw's `idata`/`other`/`sizes` structs instead (`crates/io/src/libraw.rs`), sidestepping exiv2's unverified CR3/BMFF coverage on this platform (M0 exit note) since LibRaw already parses every raw format this app decodes.
-- [x] Decoders: raw (LibRaw), JPEG/PNG/TIFF with ICC — `crates/io/src/image_rs.rs` (`ImageDecoder`); JPEG APP2 and TIFF tag-0x8773 ICC extraction are hand-rolled since `image` doesn't expose embedded profiles. `archroom_io::decoder_for(path)` picks between the two by extension.
+- [x] Decoders: raw (LibRaw), JPEG/PNG/TIFF with ICC — `crates/io/src/image_rs.rs` (`ImageDecoder`); JPEG APP2 and TIFF tag-0x8773 ICC extraction are hand-rolled since `image` doesn't expose embedded profiles. `viberoom_io::decoder_for(path)` picks between the two by extension.
 - [x] Import dialog (§7.1): portal source picker (`rfd`), Add and Copy modes, duplicate skip, progress with cancel — `crates/module-library/src/import_dialog.rs`. Scoped down from the full spec: no per-file candidate grid with checkboxes (imports everything supported under the source folder; dedupe already makes a re-run safe), no reading existing XMP sidecars (no XMP reader exists yet), no keywords/metadata-on-import (needs M2's keyword tables), and the destination template is fixed (`{dest}/{YYYY}/{YYYY-MM-DD}/`) rather than user-editable.
-- [x] Import as jobs: scan → metadata → batched inserts → L1 previews, with progress and cancel; "Previous Import" — `ImportJob` runs on `archroom-jobs`, publishes `CatalogEvent`s the dialog and Grid subscribe to; "Previous Import" is a real Catalog-panel entry (`crates/module-library/src/left_panel.rs`) backed by `latest_import_id`.
+- [x] Import as jobs: scan → metadata → batched inserts → L1 previews, with progress and cancel; "Previous Import" — `ImportJob` runs on `viberoom-jobs`, publishes `CatalogEvent`s the dialog and Grid subscribe to; "Previous Import" is a real Catalog-panel entry (`crates/module-library/src/left_panel.rs`) backed by `latest_import_id`.
 - [x] Preview cache: `previews.db` index, L1 (Grid/filmstrip) and L2 (Loupe, generated lazily on first view) — `crates/preview`. Sentinel `params_hash` until M3's develop settings exist to hash for real; no L0/L3, invalidation-on-edit or eviction budget yet (nothing invalidates a preview until Develop can edit something, and nothing's evicted until L3 exists to make the cache big).
 - [x] Grid: virtualized (`egui::ScrollArea::show_rows`, so only visible cells cost anything regardless of catalog size), thumbnail-size slider, click/shift/ctrl selection shared with the filmstrip and Loupe, rating/flag/missing badges (wired and rendering, though nothing sets rating/flag yet — that's M2) — `crates/module-library/src/grid.rs`.
 - [x] Loupe (fit/1:1 against the L2 preview, previous/next via arrow keys) and filmstrip — `crates/module-library/src/loupe.rs`, `filmstrip.rs`. Pan is via the containing `ScrollArea`'s scrollbars, not click-drag; the filmstrip isn't virtualized like the Grid is (a fast-follow if a very long unvirtualized row turns out to matter in practice).
@@ -852,10 +852,10 @@ Prove the stack end to end and lay down the skeleton.
 - [x] Raw prep glue and a RAM cache of decoded images — `engine::rawprep::SceneColor` (as-shot Temp/Tint, decoded→Rec.2020 matrix per illuminant; `io::CameraColor` now carries `xyz_to_camera`, `d65_mul` and `as_shot_mul`), `engine::cache::Lru`. Rendered files are assumed sRGB (ICC via lcms2 is not applied yet); relative WB for rendered files is not done.
 - [x] Engine: `Op` trait and registry (`op.rs`; GPU kernels attach by `Op::ID` in the pipeline, not on the trait), `EditParams` serialization and xxh3 hashing (`params.rs`), five-stage graph with per-stage cache (`pipeline.rs`), geometry pass (EXIF/user orientation + area-filter resample to the proxy; crop/straighten are M4), latest-wins render loop (`render_loop.rs`), GPU histogram. Deliberately not done: a shared texture pool (each stage owns its texture; ~200 MB at a 4 MP proxy) and ROI/1:1 rendering.
 - [x] Ops: white balance (CAT16), exposure, tone mapper + Standard/Neutral/Linear/Monochrome profiles (Hable filmic on luminance; contrast, whites, blacks), highlights/shadows (guided-filter base layer), vibrance, saturation, B&W treatment, output transform (lcms2 LUT). Image quality is unreviewed by design — the tuning pass is M4. Auto Tone / Auto WB are CPU (`engine::analysis`). Persisted through `catalog::develop` + `services::develop` (settings, coalesced history, snapshots).
-- [x] Develop module: canvas (zoom, pan, loading state), Basic panel with the `ui-kit` slider, histogram, clipping (`J`), before/after (`\`), eyedropper (`W`), Auto Tone and Auto WB — `crates/module-develop`; the photo opens as a background job (`services::session`). Zoom above Fit only enlarges the ≤4096 px proxy (ROI rendering isn't built), and the eyedropper shows Temp/Tint at the cursor but no magnified loupe yet. `ARCHROOM_START_MODULE=develop` opens the module on the first photo for smoke tests.
+- [x] Develop module: canvas (zoom, pan, loading state), Basic panel with the `ui-kit` slider, histogram, clipping (`J`), before/after (`\`), eyedropper (`W`), Auto Tone and Auto WB — `crates/module-develop`; the photo opens as a background job (`services::session`). Zoom above Fit only enlarges the ≤4096 px proxy (ROI rendering isn't built), and the eyedropper shows Temp/Tint at the cursor but no magnified loupe yet. `VIBEROOM_START_MODULE=develop` opens the module on the first photo for smoke tests.
 - [x] History (persisted and coalesced; slider drags save 300 ms after the last movement), undo/redo (Ctrl+Z/Y route to Develop when it is active), reset; copy/paste with the group dialog; Previous
 - [x] After an edit, L1/L2 re-render in the background (`services::rerender`, queued when leaving the photo or module; preview files are now named with the params hash so the UI's image cache can't serve stale ones) and the grid shows an "edited" badge
-- [~] `archroom-cli render` (`--params`, `--auto`, `--stats`, `--clip`) done; golden suite (`crates/engine/tests/golden.rs`, `tests/golden/*.png`, `just bless`) passes on RADV and llvmpipe. **Not yet wired into CI** (no CI config exists in the repo).
+- [~] `viberoom-cli render` (`--params`, `--auto`, `--stats`, `--clip`) done; golden suite (`crates/engine/tests/golden.rs`, `tests/golden/*.png`, `just bless`) passes on RADV and llvmpipe. **Not yet wired into CI** (no CI config exists in the repo).
 
 **Exit:** slider latency within budget; edits persist and render identically after a restart; the golden suite is green.
 
@@ -874,13 +874,13 @@ Prove the stack end to end and lay down the skeleton.
 
 ### M5: Export, hardening, v0.1
 
-- [x] Export dialog and presets (§9): **backend done** (`services::export`: `ExportSettings`, built-in and catalog presets in the `export_presets` table, naming templates, resize, conflict policy, JPEG/TIFF 8/16-bit none/LZW/ZIP/PNG encoders with ICC embedded for sRGB/Display P3/Adobe RGB/ProPhoto, exiv2 metadata all/copyright/none with include-on-export keyword filtering; `archroom-cli export`). Encoders are plain functions in `export::encode` rather than a registry yet (three formats). Never enlarges. **Dialog done** (Phase B): `shell::export_ui` — opened from the Library and Develop toolbars or `Ctrl+Shift+E`, presets (pick/save/delete), all §9 options with a live file-name example; `Ctrl+Alt+Shift+E` repeats the last export; a bottom-right status window shows progress, Cancel, then the result with "Show in folder". The last-used settings live in `export_presets` under a reserved name. "Ask" as a conflict policy is not offered (Rename/Overwrite/Skip).
+- [x] Export dialog and presets (§9): **backend done** (`services::export`: `ExportSettings`, built-in and catalog presets in the `export_presets` table, naming templates, resize, conflict policy, JPEG/TIFF 8/16-bit none/LZW/ZIP/PNG encoders with ICC embedded for sRGB/Display P3/Adobe RGB/ProPhoto, exiv2 metadata all/copyright/none with include-on-export keyword filtering; `viberoom-cli export`). Encoders are plain functions in `export::encode` rather than a registry yet (three formats). Never enlarges. **Dialog done** (Phase B): `shell::export_ui` — opened from the Library and Develop toolbars or `Ctrl+Shift+E`, presets (pick/save/delete), all §9 options with a live file-name example; `Ctrl+Alt+Shift+E` repeats the last export; a bottom-right status window shows progress, Cancel, then the result with "Show in folder". The last-used settings live in `export_presets` under a reserved name. "Ask" as a conflict policy is not offered (Rename/Overwrite/Skip).
 - [x] Full-resolution render path (tiling deferred); background batch export with progress and cancel — `ExportJob` (progress/cancel, atomic temp+rename, `CatalogEvent::Export*`) done; full-res renders whole-frame (16-bit output via `RenderRequest::{space, depth16}` and `output16.wgsl`), no tiling yet: `Pipeline::new` fails with `TooLarge` past the GPU's max texture size. See the performance pass below for timings
 - [ ] L3 1:1 preview cache and Develop prefetch (MVP+) — **deferred to v0.2**: 1:1 views render live from the pipeline (well inside the §12 budget on the RX 7900), so the cache buys little until a slower path needs it
-- [x] Robustness: integrity check on open, scheduled backups, crash-safe writes, clear error messages — `PRAGMA quick_check` at every launch; a catalog that will not open or fails it stays closed behind a "Catalog problem" dialog (Restore newest backup keeps the bad file as `*.damaged-<time>`; Open anyway never takes a backup); daily backup job into `Archroom Backups/` keeping the newest N (`services::backup`); `Catalog::backup_to` used 5-page steps with a 250 ms pause (an hour for a big catalog) and now uses 2048-page steps; atomic temp+fsync+rename writes for settings, preview files (`core::fsutil`), exports; preview cache housekeeping (`PreviewCache::trim`: stray files, dangling rows, oldest-first eviction to the budget). Restore-from-backup was exercised in a unit test, not clicked through the dialog.
+- [x] Robustness: integrity check on open, scheduled backups, crash-safe writes, clear error messages — `PRAGMA quick_check` at every launch; a catalog that will not open or fails it stays closed behind a "Catalog problem" dialog (Restore newest backup keeps the bad file as `*.damaged-<time>`; Open anyway never takes a backup); daily backup job into `Viberoom Backups/` keeping the newest N (`services::backup`); `Catalog::backup_to` used 5-page steps with a 250 ms pause (an hour for a big catalog) and now uses 2048-page steps; atomic temp+fsync+rename writes for settings, preview files (`core::fsutil`), exports; preview cache housekeeping (`PreviewCache::trim`: stray files, dangling rows, oldest-first eviction to the budget). Restore-from-backup was exercised in a unit test, not clicked through the dialog.
 - [x] Preferences dialog: catalog path, preview size and quality, cache budgets, XMP behavior, GPU selection, center background — `shell::prefs_ui` (`Ctrl+,` or the top-bar button), saved on every change; catalog path and GPU take effect at next launch (no live catalog switch); preview size/quality apply to previews made afterwards; the cache budget is enforced by trimming at startup. Adapter choice goes through eframe's `native_adapter_selector`, and the device now keeps the adapter's texture/buffer limits.
 - [x] Performance pass against §12 on the RX 7900 and the UHD 630; memory caps — measured with the release build and a 24.5 MP D780 NEF (portrait, `_7808140.NEF`): **full-size JPEG export 1.64 s on the RX 7900 (budget 1.5 s, missed by ~9 %) and 2.8–3.0 s on the UHD 630 (budget 4 s, met)**; a 2048 px export takes 1.3 s. Where the time goes (dev-profile stages, RX 7900): LibRaw decode 1.1 s (CPU, AHD; DHT/PPG are only 0–0.3 s faster, so demosaic is not the floor), GPU render 0.02 s (0.9 s on the UHD 630), read-back 0.06 s, JPEG encode 0.5 s. Done in this pass: the u16→f32 decode conversion and the f32→f16 upload conversion run on all cores (upload 220 → 120 ms), and JPEG encoding moved from `image` to `jpeg-encoder` with SIMD (0.86 → 0.5 s). What remains is LibRaw's decode; the plan's own GPU demosaic (§11.2 #7) is the way to get under 1.5 s. A 50,000-photo catalog (generated, `crates/catalog/tests/scale.rs`): reopen < 1 ms, `quick_check` 70 ms, full list 70 ms. Import of 2,000 generated 1200×800 JPEGs took 42 s. Peak RSS of the worst export (full-size 16-bit TIFF) is 0.9 GB; there is no explicit cap, and an image wider than the GPU's max texture size fails that photo with a clear error instead of tiling. **Not measured:** Grid scrolling at 60 fps, cold start with 50k photos through the UI, the 1:1 viewport render and RSS while browsing 50k photos (no way to drive the UI headlessly here).
-- [x] Packaging: PKGBUILD, `.desktop` file and icon; README and a shortcut cheat sheet — `packaging/PKGBUILD` (source is the tag tarball, checksum `SKIP` until v0.1.0 is published) was built with `makepkg` from a `git archive` of the tree: release build, all tests, package contents checked; `.desktop` validates; the icon is `assets/archroom.svg`
+- [x] Packaging: PKGBUILD, `.desktop` file and icon; README and a shortcut cheat sheet — `packaging/PKGBUILD` (source is the tag tarball, checksum `SKIP` until v0.1.0 is published) was built with `makepkg` from a `git archive` of the tree: release build, all tests, package contents checked; `.desktop` validates; the icon is `assets/viberoom.svg`
 
 **Exit:** the definition of done below is met, and `v0.1.0` is tagged.
 
@@ -938,7 +938,7 @@ Prove the stack end to end and lay down the skeleton.
   - No op produces NaN or Inf for random params and extreme inputs (all black, all white, saturated primaries).
 - **Golden images:**
   - About 30 raws from raw.pixls.us (CC0), covering Canon CR2/CR3, Nikon NEF, Sony ARW, Fuji RAF (X-Trans), Panasonic RW2, OM/Olympus ORF, Pentax and DNG (including phone DNGs), plus JPEG/TIFF 8/16-bit with ICC.
-  - Rendered through `archroom-cli` with a fixed set of param files and compared with ΔE2000 (mean < 0.5, p99 < 2).
+  - Rendered through `viberoom-cli` with a fixed set of param files and compared with ΔE2000 (mean < 0.5, p99 < 2).
   - Updating references is an explicit `just bless`.
   - A dedicated test checks that a proxy render matches a downscaled full-resolution render, which guards scale invariance.
 - **GPU in CI:** wgpu on lavapipe (Mesa software Vulkan). Golden tolerances absorb backend float differences.

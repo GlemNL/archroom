@@ -25,7 +25,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/GlemNL/archroom"
+repository = "https://github.com/GlemNL/viberoom"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "warn"
@@ -41,19 +41,19 @@ expect_used = "warn"
 # Internal crates, referenced by path + version so the workspace can also be
 # published later without churning every Cargo.toml.
 [workspace.dependencies]
-archroom-core = { path = "crates/core", version = "0.1.0" }
-archroom-color = { path = "crates/color", version = "0.1.0" }
+viberoom-core = { path = "crates/core", version = "0.1.0" }
+viberoom-color = { path = "crates/color", version = "0.1.0" }
 libraw-sys = { path = "crates/libraw-sys", version = "0.1.0" }
-archroom-io = { path = "crates/io", version = "0.1.0" }
-archroom-catalog = { path = "crates/catalog", version = "0.1.0" }
-archroom-jobs = { path = "crates/jobs", version = "0.1.0" }
-archroom-engine = { path = "crates/engine", version = "0.1.0" }
-archroom-preview = { path = "crates/preview", version = "0.1.0" }
-archroom-services = { path = "crates/services", version = "0.1.0" }
-archroom-ui = { path = "crates/ui-kit", version = "0.1.0" }
-archroom-shell = { path = "crates/shell", version = "0.1.0" }
-archroom-module-library = { path = "crates/module-library", version = "0.1.0" }
-archroom-module-develop = { path = "crates/module-develop", version = "0.1.0" }
+viberoom-io = { path = "crates/io", version = "0.1.0" }
+viberoom-catalog = { path = "crates/catalog", version = "0.1.0" }
+viberoom-jobs = { path = "crates/jobs", version = "0.1.0" }
+viberoom-engine = { path = "crates/engine", version = "0.1.0" }
+viberoom-preview = { path = "crates/preview", version = "0.1.0" }
+viberoom-services = { path = "crates/services", version = "0.1.0" }
+viberoom-ui = { path = "crates/ui-kit", version = "0.1.0" }
+viberoom-shell = { path = "crates/shell", version = "0.1.0" }
+viberoom-module-library = { path = "crates/module-library", version = "0.1.0" }
+viberoom-module-develop = { path = "crates/module-develop", version = "0.1.0" }
 
 # Shared third-party dependencies (kept in one place so every crate uses the
 # same version). Exact versions are pinned in Cargo.lock.

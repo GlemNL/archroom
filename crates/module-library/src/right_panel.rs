@@ -8,12 +8,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use archroom_core::ids::{KeywordId, PhotoId};
-use archroom_core::settings::XmpAutoWrite;
-use archroom_services::command::{AddKeywords, IptcField, RemoveKeywords, SetIptc};
-use archroom_services::repo::{self, KeywordRow};
-use archroom_services::sidecar::SaveXmpJob;
-use archroom_shell::AppCx;
+use viberoom_core::ids::{KeywordId, PhotoId};
+use viberoom_core::settings::XmpAutoWrite;
+use viberoom_services::command::{AddKeywords, IptcField, RemoveKeywords, SetIptc};
+use viberoom_services::repo::{self, KeywordRow};
+use viberoom_services::sidecar::SaveXmpJob;
+use viberoom_shell::AppCx;
 
 use crate::photos::LibraryData;
 use crate::shortcuts;

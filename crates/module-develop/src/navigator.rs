@@ -49,7 +49,7 @@ pub fn show(ui: &mut egui::Ui, m: &mut DevelopModule) {
     painter.rect_stroke(
         egui::Rect::from_min_max(to_nav(visible.min), to_nav(visible.max)),
         0.0,
-        egui::Stroke::new(1.5_f32, archroom_ui::ACCENT),
+        egui::Stroke::new(1.5_f32, viberoom_ui::ACCENT),
         egui::StrokeKind::Inside,
     );
     painter.rect_stroke(

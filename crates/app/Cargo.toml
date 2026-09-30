@@ -1,32 +1,32 @@
 [package]
-name = "archroom-app"
+name = "viberoom-app"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "archroom"
+name = "viberoom"
 path = "src/main.rs"
 
 [lints]
 workspace = true
 
 [dependencies]
-archroom-core = { workspace = true }
-archroom-catalog = { workspace = true }
-archroom-jobs = { workspace = true }
-archroom-shell = { workspace = true }
-archroom-ui = { workspace = true }
-archroom-services = { workspace = true }
-archroom-module-library = { workspace = true }
-archroom-module-develop = { workspace = true }
+viberoom-core = { workspace = true }
+viberoom-catalog = { workspace = true }
+viberoom-jobs = { workspace = true }
+viberoom-shell = { workspace = true }
+viberoom-ui = { workspace = true }
+viberoom-services = { workspace = true }
+viberoom-module-library = { workspace = true }
+viberoom-module-develop = { workspace = true }
 eframe = { version = "0.33", default-features = false, features = ["default_fonts", "wgpu", "persistence", "wayland", "x11", "accesskit"] }
 egui = "0.33"
 # "file" + "image": the Grid/Loupe (module-library) load preview JPEGs via
 # `egui::Image::from_uri("file://…")`. Loaders are installed once here, at
 # app startup; egui_extras's vendored `image` crate picks up jpeg/png/tiff
-# support for free via Cargo's feature unification with archroom-io's.
+# support for free via Cargo's feature unification with viberoom-io's.
 egui_extras = { version = "0.33", features = ["file", "image"] }
 # eframe's own `wgpu` dependency turns off all backends (default-features =
 # false with no backend feature); Cargo unifies features for a shared crate
@@ -38,15 +38,15 @@ tracing = { workspace = true }
 directories = { workspace = true }
 crossbeam-channel = { workspace = true }
 
-# `cargo deb -p archroom-app` (see .github/workflows/release.yml). Build both
-# binaries first: `cargo build --release -p archroom-app -p archroom-cli`.
+# `cargo deb -p viberoom-app` (see .github/workflows/release.yml). Build both
+# binaries first: `cargo build --release -p viberoom-app -p viberoom-cli`.
 [package.metadata.deb]
-name = "archroom"
+name = "viberoom"
 maintainer = "Clément L <a.kenbari@gmail.com>"
-copyright = "Archroom contributors"
+copyright = "Viberoom contributors"
 license-file = ["../../LICENSE", "0"]
 extended-description = """\
-Archroom is a Linux-native, non-destructive photo library and raw developer: \
+Viberoom is a Linux-native, non-destructive photo library and raw developer: \
 catalog thousands of photos, cull them from the keyboard, and develop raws on \
 the GPU without ever touching your originals."""
 section = "graphics"
@@ -54,9 +54,9 @@ priority = "optional"
 depends = "$auto, libvulkan1"
 recommends = "mesa-vulkan-drivers, xdg-desktop-portal"
 assets = [
-    ["target/release/archroom", "usr/bin/", "755"],
-    ["target/release/archroom-cli", "usr/bin/", "755"],
-    ["../../packaging/archroom.desktop", "usr/share/applications/", "644"],
-    ["../../assets/archroom.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
-    ["../../README.md", "usr/share/doc/archroom/", "644"],
+    ["target/release/viberoom", "usr/bin/", "755"],
+    ["target/release/viberoom-cli", "usr/bin/", "755"],
+    ["../../packaging/viberoom.desktop", "usr/share/applications/", "644"],
+    ["../../assets/viberoom.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
+    ["../../README.md", "usr/share/doc/viberoom/", "644"],
 ]

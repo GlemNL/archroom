@@ -32,8 +32,8 @@ jobs:
           fi
           grep -q "^pkgver=$version\$" packaging/PKGBUILD \
             || { echo "::error::packaging/PKGBUILD pkgver != $version"; exit 1; }
-          grep -q "^Version:[[:space:]]*$version\$" packaging/archroom.spec \
-            || { echo "::error::packaging/archroom.spec Version != $version"; exit 1; }
+          grep -q "^Version:[[:space:]]*$version\$" packaging/viberoom.spec \
+            || { echo "::error::packaging/viberoom.spec Version != $version"; exit 1; }
 
   # Stable source tarball (GitHub's auto-generated archives can change
   # checksum); the Arch and RPM builds consume it.
@@ -46,11 +46,11 @@ jobs:
       - name: Archive
         run: |
           v=${{ needs.check.outputs.version }}
-          git archive --format=tar.gz --prefix="archroom-$v/" -o "archroom-$v.tar.gz" HEAD
+          git archive --format=tar.gz --prefix="viberoom-$v/" -o "viberoom-$v.tar.gz" HEAD
       - uses: actions/upload-artifact@v4
         with:
           name: source
-          path: archroom-*.tar.gz
+          path: viberoom-*.tar.gz
 
   # Debian packages link against the distro's own libraw soname, so they are
   # built once per supported release instead of once for all.
@@ -75,10 +75,10 @@ jobs:
         with:
           key: ${{ matrix.os }}
       - run: cargo install cargo-deb --locked
-      - run: cargo build --release --locked -p archroom-app -p archroom-cli
+      - run: cargo build --release --locked -p viberoom-app -p viberoom-cli
       - name: Package
         run: |
-          cargo deb -p archroom-app --no-build --output dist/
+          cargo deb -p viberoom-app --no-build --output dist/
           cd dist
           for f in *.deb; do
             mv "$f" "${f%.deb}_${{ matrix.os }}.deb"
@@ -107,8 +107,8 @@ jobs:
       - name: Build
         run: |
           mkdir -p ~/rpmbuild/SOURCES
-          cp archroom-*.tar.gz ~/rpmbuild/SOURCES/
-          rpmbuild -bb repo/packaging/archroom.spec
+          cp viberoom-*.tar.gz ~/rpmbuild/SOURCES/
+          rpmbuild -bb repo/packaging/viberoom.spec
           mkdir dist && cp ~/rpmbuild/RPMS/*/*.rpm dist/
       - uses: actions/upload-artifact@v4
         with:
@@ -135,7 +135,7 @@ jobs:
           useradd -m builder
           v=${{ needs.check.outputs.version }}
           mkdir /home/builder/pkg
-          cp archroom-$v.tar.gz /home/builder/pkg/
+          cp viberoom-$v.tar.gz /home/builder/pkg/
           # Build from the local tarball instead of the (not yet published) tag.
           sed -e 's|^source=.*|source=("$pkgname-$pkgver.tar.gz")|' \
               repo/packaging/PKGBUILD > /home/builder/pkg/PKGBUILD
@@ -165,7 +165,7 @@ jobs:
             libxkbcommon-dev libwayland-dev libvulkan-dev file
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --release --locked -p archroom-app -p archroom-cli
+      - run: cargo build --release --locked -p viberoom-app -p viberoom-cli
       - name: Build AppImage
         env:
           APPIMAGE_EXTRACT_AND_RUN: "1"
@@ -177,13 +177,13 @@ jobs:
           curl -fsSLO $base/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage
           chmod +x linuxdeploy-*.AppImage
           ./linuxdeploy-x86_64.AppImage --appdir AppDir \
-            --executable target/release/archroom \
-            --executable target/release/archroom-cli \
-            --desktop-file packaging/archroom.desktop \
-            --icon-file assets/archroom.svg \
+            --executable target/release/viberoom \
+            --executable target/release/viberoom-cli \
+            --desktop-file packaging/viberoom.desktop \
+            --icon-file assets/viberoom.svg \
             --output appimage
           mkdir dist
-          mv Archroom-*.AppImage "dist/archroom-$VERSION-x86_64.AppImage"
+          mv Viberoom-*.AppImage "dist/viberoom-$VERSION-x86_64.AppImage"
       - uses: actions/upload-artifact@v4
         with:
           name: appimage

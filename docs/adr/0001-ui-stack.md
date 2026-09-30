@@ -5,7 +5,7 @@
 
 ## Context
 
-Archroom's Develop canvas needs to draw a GPU-rendered image, at interactive
+Viberoom's Develop canvas needs to draw a GPU-rendered image, at interactive
 frame rates, inside the same window as dense tool panels (sliders, curve
 editors, a filmstrip). The UI toolkit and the GPU compute pipeline should
 ideally share one GPU device so the rendered image can be shown with zero
@@ -19,7 +19,7 @@ heavy FFI surface); Slint (declarative, GPU interop less direct); `iced`
 
 `egui` + `eframe`, with the `wgpu` backend. Immediate-mode UI suits the
 dense, frequently-rebuilt tool panels Lightroom-style apps need. `eframe`'s
-wgpu backend shares the same `wgpu::Device`/`Queue` as `archroom-engine`, so
+wgpu backend shares the same `wgpu::Device`/`Queue` as `viberoom-engine`, so
 the Develop canvas can paint the pipeline's output texture directly via an
 egui paint callback.
 

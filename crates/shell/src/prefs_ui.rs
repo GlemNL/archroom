@@ -5,9 +5,9 @@
 
 use std::path::PathBuf;
 
-use archroom_core::settings::{CenterBackground, ClickZoom, XmpAutoWrite};
-use archroom_services::backup::list_backups;
-use archroom_services::engine::gpu::GpuContext;
+use viberoom_core::settings::{CenterBackground, ClickZoom, XmpAutoWrite};
+use viberoom_services::backup::list_backups;
+use viberoom_services::engine::gpu::GpuContext;
 
 use crate::AppCx;
 
@@ -53,7 +53,7 @@ impl PreferencesUi {
             self.open = false;
         }
         if cx.settings != before {
-            archroom_services::set_preview_options(
+            viberoom_services::set_preview_options(
                 cx.settings.preview_long_edge,
                 cx.settings.preview_jpeg_quality,
             );
@@ -77,21 +77,21 @@ impl PreferencesUi {
                     ui.horizontal(|ui| {
                         if ui.button("Open another…").clicked()
                             && let Some(p) = rfd::FileDialog::new()
-                                .add_filter("Archroom catalog", &["arcat"])
+                                .add_filter("Viberoom catalog", &["arcat"])
                                 .pick_file()
                         {
                             s.last_catalog = Some(p);
                         }
                         if ui.button("New…").clicked()
                             && let Some(p) = rfd::FileDialog::new()
-                                .add_filter("Archroom catalog", &["arcat"])
-                                .set_file_name("Archroom.arcat")
+                                .add_filter("Viberoom catalog", &["arcat"])
+                                .set_file_name("Viberoom.arcat")
                                 .save_file()
                         {
                             s.last_catalog = Some(with_arcat_extension(p));
                         }
                     });
-                    ui.weak("Takes effect the next time Archroom starts.");
+                    ui.weak("Takes effect the next time Viberoom starts.");
                 });
                 ui.end_row();
 
@@ -168,7 +168,7 @@ impl PreferencesUi {
                                 ui.selectable_value(&mut s.gpu_adapter, Some(name.clone()), name);
                             }
                         });
-                    ui.weak("Takes effect the next time Archroom starts.");
+                    ui.weak("Takes effect the next time Viberoom starts.");
                 });
                 ui.end_row();
 

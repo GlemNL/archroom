@@ -1,5 +1,5 @@
 [package]
-name = "archroom-module-library"
+name = "viberoom-module-library"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,10 +9,10 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-archroom-core = { workspace = true }
-archroom-services = { workspace = true }
-archroom-shell = { workspace = true }
-archroom-ui = { workspace = true }
+viberoom-core = { workspace = true }
+viberoom-services = { workspace = true }
+viberoom-shell = { workspace = true }
+viberoom-ui = { workspace = true }
 crossbeam-channel = { workspace = true }
 egui = "0.33"
 rfd = "0.15"

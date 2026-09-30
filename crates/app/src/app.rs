@@ -1,16 +1,16 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use archroom_catalog::Catalog;
-use archroom_jobs::{JobEventKind, Scheduler};
-use archroom_services::backup::{BackupJob, BackupOutcome, list_backups, restore_backup};
-use archroom_services::preview::TrimPreviewsJob;
-use archroom_shell::{AppCx, ExportRequestKind, ExportUi, ModuleRegistry, PreferencesUi};
+use viberoom_catalog::Catalog;
+use viberoom_jobs::{JobEventKind, Scheduler};
+use viberoom_services::backup::{BackupJob, BackupOutcome, list_backups, restore_backup};
+use viberoom_services::preview::TrimPreviewsJob;
+use viberoom_shell::{AppCx, ExportRequestKind, ExportUi, ModuleRegistry, PreferencesUi};
 use crossbeam_channel::Receiver;
 use tracing::{error, info};
 
-/// `~/Pictures/Archroom/Archroom.arcat`, the default catalog location
-/// (plan §4.7). Falls back to `~/Archroom/Archroom.arcat` if the platform
+/// `~/Pictures/Viberoom/Viberoom.arcat`, the default catalog location
+/// (plan §4.7). Falls back to `~/Viberoom/Viberoom.arcat` if the platform
 /// has no Pictures directory.
 fn default_catalog_path() -> PathBuf {
     let pictures =
@@ -20,7 +20,7 @@ fn default_catalog_path() -> PathBuf {
             .map(|d| d.home_dir().to_path_buf())
             .unwrap_or_default()
     });
-    base.join("Archroom").join("Archroom.arcat")
+    base.join("Viberoom").join("Viberoom.arcat")
 }
 
 /// Why the catalog could not be used as-is.
@@ -76,7 +76,7 @@ fn finish_open(
     take_backup: bool,
 ) -> Receiver<BackupOutcome> {
     info!(path = %path.display(), "catalog ready");
-    match archroom_services::PreviewCache::open_for_catalog(path) {
+    match viberoom_services::PreviewCache::open_for_catalog(path) {
         Ok(previews) => cx.previews = Some(previews),
         Err(e) => error!(error = %e, "failed to open preview cache"),
     }
@@ -101,10 +101,10 @@ fn finish_open(
     rx
 }
 
-pub struct ArchroomApp {
+pub struct ViberoomApp {
     cx: AppCx,
     registry: ModuleRegistry,
-    job_events: Receiver<archroom_jobs::JobEvent>,
+    job_events: Receiver<viberoom_jobs::JobEvent>,
     active_jobs: usize,
     show_side_panels: bool,
     export_ui: ExportUi,
@@ -115,9 +115,9 @@ pub struct ArchroomApp {
     backup_note: Option<String>,
 }
 
-impl ArchroomApp {
+impl ViberoomApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        archroom_ui::apply_theme(&cc.egui_ctx);
+        viberoom_ui::apply_theme(&cc.egui_ctx);
         egui_extras::install_image_loaders(&cc.egui_ctx);
 
         let jobs = Arc::new(Scheduler::new(0));
@@ -127,7 +127,7 @@ impl ArchroomApp {
             cx.set_render_state(rs);
         }
 
-        archroom_services::set_preview_options(
+        viberoom_services::set_preview_options(
             cx.settings.preview_long_edge,
             cx.settings.preview_jpeg_quality,
         );
@@ -143,18 +143,18 @@ impl ArchroomApp {
         };
 
         let registry = ModuleRegistry::new(vec![
-            Box::new(archroom_module_library::LibraryModule::new()),
-            Box::new(archroom_module_develop::DevelopModule::new()),
+            Box::new(viberoom_module_library::LibraryModule::new()),
+            Box::new(viberoom_module_develop::DevelopModule::new()),
         ]);
 
         let mut registry = registry;
-        // Dev/test hook: `ARCHROOM_START_MODULE=develop` opens that module
+        // Dev/test hook: `VIBEROOM_START_MODULE=develop` opens that module
         // with the first photo selected, for headless smoke tests.
-        if let Ok(id) = std::env::var("ARCHROOM_START_MODULE") {
+        if let Ok(id) = std::env::var("VIBEROOM_START_MODULE") {
             if let Some(catalog) = &cx.catalog
-                && let Ok(photos) = archroom_services::repo::list_all_photos(
+                && let Ok(photos) = viberoom_services::repo::list_all_photos(
                     catalog.connection(),
-                    archroom_services::repo::PhotoSort::default(),
+                    viberoom_services::repo::PhotoSort::default(),
                 )
                 && let Some(first) = photos.first()
             {
@@ -356,7 +356,7 @@ impl ArchroomApp {
             {
                 self.cx
                     .jobs
-                    .submit(archroom_services::sidecar::SaveXmpJob::new(
+                    .submit(viberoom_services::sidecar::SaveXmpJob::new(
                         catalog_path,
                         ids,
                     ));
@@ -365,7 +365,7 @@ impl ArchroomApp {
     }
 }
 
-impl eframe::App for ArchroomApp {
+impl eframe::App for ViberoomApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.drain_job_events();
         if let Ok(outcome) = self.backup_rx.try_recv()
@@ -383,7 +383,7 @@ impl eframe::App for ArchroomApp {
 
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.heading("Archroom");
+                ui.heading("Viberoom");
                 ui.separator();
 
                 let modules: Vec<_> = self

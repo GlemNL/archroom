@@ -1,6 +1,6 @@
 mod app;
 
-use app::ArchroomApp;
+use app::ViberoomApp;
 
 /// The GPU setup: the adapter named in Preferences when it exists (else the
 /// default one), and a device that keeps the adapter's texture and buffer
@@ -33,22 +33,22 @@ fn wgpu_setup(preferred: Option<String>) -> eframe::egui_wgpu::WgpuSetup {
 }
 
 fn main() -> anyhow::Result<()> {
-    archroom_core::tracing_setup::init();
+    viberoom_core::tracing_setup::init();
 
     let mut options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([1440.0, 900.0]),
         ..Default::default()
     };
     options.wgpu_options.wgpu_setup = wgpu_setup(
-        archroom_core::settings::Settings::load()
+        viberoom_core::settings::Settings::load()
             .ok()
             .and_then(|s| s.gpu_adapter),
     );
 
     eframe::run_native(
-        "Archroom",
+        "Viberoom",
         options,
-        Box::new(|cc| Ok(Box::new(ArchroomApp::new(cc)))),
+        Box::new(|cc| Ok(Box::new(ViberoomApp::new(cc)))),
     )
     .map_err(|e| anyhow::anyhow!("eframe error: {e}"))?;
 

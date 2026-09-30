@@ -1,5 +1,5 @@
 [package]
-name = "archroom-engine"
+name = "viberoom-engine"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,9 +10,9 @@ workspace = true
 
 [dependencies]
 rayon = { workspace = true }
-archroom-core = { workspace = true }
-archroom-color = { workspace = true }
-archroom-io = { workspace = true }
+viberoom-core = { workspace = true }
+viberoom-color = { workspace = true }
+viberoom-io = { workspace = true }
 wgpu = { version = "27", default-features = false, features = ["vulkan", "wgsl"] }
 bytemuck = { version = "1", features = ["derive"] }
 half = { version = "2", features = ["bytemuck"] }

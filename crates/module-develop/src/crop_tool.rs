@@ -4,12 +4,12 @@
 //! handles and a composition overlay on top. All rectangles are normalised
 //! to the canvas, like the `crop` op's.
 
-use archroom_services::engine::EditParams;
-use archroom_services::engine::Op;
-use archroom_services::engine::geometry::{
+use viberoom_services::engine::EditParams;
+use viberoom_services::engine::Op;
+use viberoom_services::engine::geometry::{
     MIN_CROP, constrain_between, fit_rect, level_angle, mirror_rect, rotate_rect_cw, sanitize,
 };
-use archroom_services::engine::ops::{Crop, Straighten, StraightenParams};
+use viberoom_services::engine::ops::{Crop, Straighten, StraightenParams};
 use egui::{Color32, CursorIcon, Pos2, Rect, Stroke};
 
 use crate::basic::{Change, spec_slider};
@@ -653,7 +653,7 @@ impl CropTool {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use archroom_services::engine::ops::CropParams;
+    use viberoom_services::engine::ops::CropParams;
 
     #[test]
     fn a_locked_corner_drag_keeps_the_ratio_and_anchors_the_opposite_corner() {

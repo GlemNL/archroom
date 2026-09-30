@@ -1,11 +1,11 @@
 [Desktop Entry]
 Type=Application
-Name=Archroom
+Name=Viberoom
 GenericName=Photo Manager and Raw Developer
 Comment=Organize and develop raw photos
-Exec=archroom
-Icon=archroom
+Exec=viberoom
+Icon=viberoom
 Terminal=false
 Categories=Graphics;Photography;RasterGraphics;2DGraphics;
 Keywords=photo;raw;develop;catalog;lightroom;
-StartupWMClass=archroom
+StartupWMClass=viberoom

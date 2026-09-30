@@ -1,25 +1,25 @@
 //! Catalog backups and recovery (plan §14: catalog corruption is a
 //! high-impact risk). Backups are SQLite online-backup copies in
-//! `Archroom Backups/` next to the catalog, taken at most once a day at
+//! `Viberoom Backups/` next to the catalog, taken at most once a day at
 //! startup (only from a catalog that just passed its check), newest N kept.
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use archroom_catalog::Catalog;
-use archroom_jobs::{Job, JobContext, Priority};
+use viberoom_catalog::Catalog;
+use viberoom_jobs::{Job, JobContext, Priority};
 use crossbeam_channel::Sender;
 
 use crate::error::{Error, Result};
 
-const PREFIX: &str = "Archroom-";
+const PREFIX: &str = "Viberoom-";
 const EXT: &str = "arcat";
 
 pub fn backup_dir(catalog_path: &Path) -> PathBuf {
     catalog_path
         .parent()
         .unwrap_or_else(|| Path::new("."))
-        .join("Archroom Backups")
+        .join("Viberoom Backups")
 }
 
 /// `YYYYMMDD-HHMMSS` (UTC) for `t`.
@@ -106,7 +106,7 @@ pub fn restore_backup(catalog_path: &Path, backup: &Path, now: SystemTime) -> Re
     let name = catalog_path
         .file_name()
         .and_then(|n| n.to_str())
-        .unwrap_or("Archroom.arcat");
+        .unwrap_or("Viberoom.arcat");
     let moved = catalog_path.with_file_name(format!("{name}.damaged-{}", stamp(now)));
     if catalog_path.exists() {
         std::fs::rename(catalog_path, &moved).map_err(|e| Error::io(catalog_path, e))?;
@@ -196,7 +196,7 @@ mod tests {
     #[test]
     fn daily_backups_prune_and_restore() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("Archroom.arcat");
+        let path = dir.path().join("Viberoom.arcat");
         let catalog = Catalog::create_or_open(&path).unwrap();
         catalog
             .connection()
@@ -226,7 +226,7 @@ mod tests {
         assert!(kept[0] > kept[1], "newest first");
         assert!(
             !dir.path()
-                .join("Archroom Backups")
+                .join("Viberoom Backups")
                 .read_dir()
                 .unwrap()
                 .any(|e| { e.unwrap().file_name().to_string_lossy().starts_with('.') })

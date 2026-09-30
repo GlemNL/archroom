@@ -1,5 +1,5 @@
 [package]
-name = "archroom-ui"
+name = "viberoom-ui"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,7 +9,7 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-archroom-core = { workspace = true }
+viberoom-core = { workspace = true }
 egui = "0.33"
 egui_extras = { version = "0.33", features = ["image"] }
 serde = { workspace = true }

@@ -4,14 +4,14 @@
 //! `&rusqlite::Connection` (matching every `repo.rs` function) rather than
 //! a separate `CatalogTx` wrapper, and return `Result<CatalogEvent>`
 //! directly rather than a `ChangeSet` that would just get converted to one
-//! — `archroom_core::events::CatalogEvent` already models "what changed."
+//! — `viberoom_core::events::CatalogEvent` already models "what changed."
 //!
 //! Each command captures the previous per-photo values on `apply`, so
 //! `revert` can restore them exactly — the session-scoped undo stack that
-//! holds these (plan §4.5) lives in `archroom-shell`, not here.
+//! holds these (plan §4.5) lives in `viberoom-shell`, not here.
 
-use archroom_core::events::{CatalogEvent, PhotoField};
-use archroom_core::ids::{CollectionId, KeywordId, PhotoId};
+use viberoom_core::events::{CatalogEvent, PhotoField};
+use viberoom_core::ids::{CollectionId, KeywordId, PhotoId};
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::error::Result;
