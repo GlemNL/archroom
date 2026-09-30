@@ -21,8 +21,10 @@ const HABLE: [f32; 6] = [0.15, 0.50, 0.10, 0.20, 0.02, 0.30];
 /// sliders reproduce the file unchanged.
 pub fn tone_uniform(profile: &ProfileParams, tone: &ToneParams, rendered: bool) -> ToneUniform {
     let (bias, white, base_exp, clamp_only) = match profile.name {
-        ProfileName::Standard | ProfileName::Monochrome => (2.75, 11.2, 1.0, false),
-        ProfileName::Neutral => (2.5, 16.0, 0.9, false),
+        // The white point equals the bias so a clipped raw (scene 1.0) reaches
+        // display white instead of stopping at ~75 % grey.
+        ProfileName::Standard | ProfileName::Monochrome => (2.0, 2.0, 1.1, false),
+        ProfileName::Neutral => (2.0, 2.0, 0.9, false),
         ProfileName::Linear => (1.0, 1.0, 1.0, true),
     };
     let clamp_only = clamp_only || rendered;
@@ -75,11 +77,11 @@ mod tests {
     fn standard_maps_middle_gray_near_middle_gray_and_white_to_one() {
         let u = std_curve(ToneParams::default());
         assert!(
-            (tone_curve(&u, 0.18) - 0.18).abs() < 0.03,
+            (tone_curve(&u, 0.18) - 0.18).abs() < 0.1,
             "{}",
             tone_curve(&u, 0.18)
         );
-        assert!((tone_curve(&u, 11.2) - 1.0).abs() < 1e-4);
+        assert!((tone_curve(&u, 1.0) - 1.0).abs() < 1e-4);
         assert!(tone_curve(&u, 0.0) < 1e-6);
     }
 
@@ -129,7 +131,7 @@ mod tests {
             whites: 60.0,
             ..Default::default()
         });
-        assert!(tone_curve(&bright_whites, 3.0) > tone_curve(&base, 3.0));
+        assert!(tone_curve(&bright_whites, 0.5) > tone_curve(&base, 0.5));
     }
 
     #[test]

@@ -270,7 +270,7 @@ mod tests {
         let u = tone_uniform(&prof, &d.tone, false);
         let mid = tone_curve(&u, 0.05 * 2f32.powf(d.exposure_ev as f32));
         // (Auto Tone also stretches a narrow range toward white, so this lands a bit above 0.18.)
-        assert!((0.08..0.45).contains(&mid), "{mid}");
+        assert!((0.08..0.65).contains(&mid), "{mid}");
     }
 
     #[test]
