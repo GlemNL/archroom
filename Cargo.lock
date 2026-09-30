@@ -277,8 +277,6 @@ dependencies = [
  "anyhow",
  "archroom-catalog",
  "archroom-core",
- "archroom-engine",
- "archroom-io",
  "archroom-jobs",
  "archroom-module-develop",
  "archroom-module-library",
