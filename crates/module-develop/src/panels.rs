@@ -2,12 +2,12 @@
 //! and Effects. Each edits a working copy of the params and reports what
 //! changed, like the Basic panel.
 
-use archroom_services::engine::ops::{
+use viberoom_services::engine::ops::{
     BANDS, BwMix, Hsl, MonotoneCurve, Noise, Profile, ProfileName, Sharpen, ToneCurve, Treatment,
     Vignette,
 };
-use archroom_services::engine::{EditParams, Op};
-use archroom_ui::{CurveEdit, LrSlider, curve_editor};
+use viberoom_services::engine::{EditParams, Op};
+use viberoom_ui::{CurveEdit, LrSlider, curve_editor};
 
 use crate::basic::{Change, spec_slider};
 
@@ -176,7 +176,7 @@ fn tone_curve(
         let mut x = before;
         ui.add(
             LrSlider::new(name, &mut x, 5.0..=95.0)
-                .default_value(archroom_services::engine::ops::ToneCurve::default_split(i) as f32)
+                .default_value(viberoom_services::engine::ops::ToneCurve::default_split(i) as f32)
                 .step(1.0, 5.0)
                 .decimals(0)
                 .label_width(110.0),

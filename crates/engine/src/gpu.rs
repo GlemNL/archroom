@@ -43,7 +43,7 @@ impl GpuContext {
             .collect()
     }
 
-    /// A headless Vulkan device. `ARCHROOM_ADAPTER=<substring>` picks an
+    /// A headless Vulkan device. `VIBEROOM_ADAPTER=<substring>` picks an
     /// adapter by name (e.g. `llvmpipe` for the software fallback used by
     /// CI); otherwise the high-performance one. `None` when there is none.
     pub fn headless() -> Option<Self> {
@@ -51,7 +51,7 @@ impl GpuContext {
             backends: wgpu::Backends::VULKAN,
             ..Default::default()
         });
-        let wanted = std::env::var("ARCHROOM_ADAPTER").ok();
+        let wanted = std::env::var("VIBEROOM_ADAPTER").ok();
         let adapter = match &wanted {
             Some(name) => instance
                 .enumerate_adapters(wgpu::Backends::VULKAN)
@@ -70,7 +70,7 @@ impl GpuContext {
         }?;
         let info = adapter.get_info();
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-            label: Some("archroom-engine"),
+            label: Some("viberoom-engine"),
             // A 100 MP raw is wider than the 8192 default.
             required_limits: adapter.limits(),
             ..Default::default()

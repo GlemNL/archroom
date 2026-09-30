@@ -137,7 +137,7 @@ fn encode_tiff<W: Write + Seek>(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use archroom_color::icc::OutputSpace;
+    use viberoom_color::icc::OutputSpace;
 
     fn gradient16(w: u32, h: u32) -> Vec<u16> {
         (0..w * h)

@@ -9,12 +9,12 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use archroom_catalog::Catalog;
-use archroom_catalog::repo;
-use archroom_core::events::{CatalogEvent, EventBus};
-use archroom_core::ids::{FolderId, ImportId, PhotoId};
-use archroom_jobs::{Job, JobContext, Priority as JobPriority};
-use archroom_preview::{L1_BUDGET_PX, LEVEL_L1, PreviewCache};
+use viberoom_catalog::Catalog;
+use viberoom_catalog::repo;
+use viberoom_core::events::{CatalogEvent, EventBus};
+use viberoom_core::ids::{FolderId, ImportId, PhotoId};
+use viberoom_jobs::{Job, JobContext, Priority as JobPriority};
+use viberoom_preview::{L1_BUDGET_PX, LEVEL_L1, PreviewCache};
 use rusqlite::Connection;
 
 use crate::error::Result;
@@ -178,7 +178,7 @@ fn import_one(
         return Ok(ImportOutcome::Duplicate);
     }
 
-    let decoder = archroom_io::decoder_for(path)
+    let decoder = viberoom_io::decoder_for(path)
         .ok_or_else(|| crate::error::Error::Other(format!("no decoder for {}", path.display())))?;
     let metadata = decoder.metadata(path)?;
 
@@ -272,7 +272,7 @@ fn quick_hash_of(path: &Path) -> Result<Vec<u8>> {
 /// Copy mode: `{dest}/{YYYY}/{YYYY-MM-DD}/{filename}`, hash-verified before
 /// the copy is treated as a source for the normal Add path (plan §7.1).
 fn copy_into(src: &Path, dest: &Path) -> Result<PathBuf> {
-    let metadata = archroom_io::decoder_for(src)
+    let metadata = viberoom_io::decoder_for(src)
         .and_then(|d| d.metadata(src).ok())
         .and_then(|m| m.capture_time)
         .unwrap_or_default();
@@ -308,7 +308,7 @@ fn copy_into(src: &Path, dest: &Path) -> Result<PathBuf> {
     Ok(dst)
 }
 
-/// Runs [`run_import`] as an `archroom-jobs` background job, publishing
+/// Runs [`run_import`] as an `viberoom-jobs` background job, publishing
 /// `CatalogEvent`s so the UI's view models can invalidate (plan §4.5/§4.6).
 #[derive(Debug)]
 pub struct ImportJob {

@@ -1,8 +1,8 @@
 //! The Library filter bar (plan §7.5) and the rule editor shared with the
 //! smart-collection dialog. Both produce `criteria::Rule`s; every bit of
-//! SQL lives in `archroom_catalog::criteria`, not here.
+//! SQL lives in `viberoom_catalog::criteria`, not here.
 
-use archroom_services::criteria::{FlagValue, RelOp, Rule, SmartRules};
+use viberoom_services::criteria::{FlagValue, RelOp, Rule, SmartRules};
 
 use crate::shortcuts::COLOR_LABELS;
 

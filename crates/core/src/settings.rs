@@ -1,5 +1,5 @@
 //! Application preferences, stored as TOML under the XDG config directory
-//! (`~/.config/archroom/config.toml`, see plan §4.7).
+//! (`~/.config/viberoom/config.toml`, see plan §4.7).
 //!
 //! `Settings` only holds user-visible preferences. Anything derived at
 //! runtime (window geometry, panel open state) is `eframe`/`egui`'s own
@@ -83,9 +83,9 @@ impl Default for Settings {
 }
 
 impl Settings {
-    /// `~/.config/archroom/config.toml` (XDG on Linux).
+    /// `~/.config/viberoom/config.toml` (XDG on Linux).
     pub fn config_path() -> Result<PathBuf> {
-        let dirs = directories::ProjectDirs::from("", "", "archroom")
+        let dirs = directories::ProjectDirs::from("", "", "viberoom")
             .ok_or_else(|| Error::Settings("no home directory".into()))?;
         Ok(dirs.config_dir().join("config.toml"))
     }

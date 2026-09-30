@@ -7,7 +7,7 @@ pub enum Error {
     #[error("camera colour matrix is singular")]
     BadCameraMatrix,
     #[error("display transform: {0}")]
-    Icc(#[from] archroom_color::icc::Error),
+    Icc(#[from] viberoom_color::icc::Error),
     #[error("GPU readback failed: {0}")]
     Readback(String),
 }

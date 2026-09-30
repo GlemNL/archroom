@@ -2,10 +2,10 @@
 //! `develop_settings`/`history` tables. The catalog stores opaque JSON;
 //! the hash and the identity rule ("unedited ⇒ no row") live here.
 
-use archroom_catalog::develop::{self, DevelopRow};
-use archroom_core::events::{CatalogEvent, PhotoField};
-use archroom_core::ids::PhotoId;
-use archroom_engine::EditParams;
+use viberoom_catalog::develop::{self, DevelopRow};
+use viberoom_core::events::{CatalogEvent, PhotoField};
+use viberoom_core::ids::PhotoId;
+use viberoom_engine::EditParams;
 use rusqlite::Connection;
 
 use crate::error::Result;
@@ -125,9 +125,9 @@ pub fn redo_target(rows: &[develop::HistoryRow], cursor: Option<i64>) -> Option<
 pub fn paste_groups(
     target: &mut EditParams,
     source: &EditParams,
-    groups: &[archroom_engine::SettingsGroup],
+    groups: &[viberoom_engine::SettingsGroup],
 ) {
-    let registry = archroom_engine::ops::default_registry();
+    let registry = viberoom_engine::ops::default_registry();
     for op in registry.iter() {
         if !groups.contains(&op.group()) {
             continue;
@@ -147,9 +147,9 @@ pub fn paste_groups(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use archroom_catalog::Catalog;
-    use archroom_catalog::repo::{self, NewFile, NewPhoto};
-    use archroom_engine::ops::{Exposure, ExposureParams};
+    use viberoom_catalog::Catalog;
+    use viberoom_catalog::repo::{self, NewFile, NewPhoto};
+    use viberoom_engine::ops::{Exposure, ExposureParams};
 
     fn photo(conn: &Connection) -> PhotoId {
         let folder = repo::upsert_folder_path(conn, std::path::Path::new("/p")).unwrap();
@@ -261,7 +261,7 @@ mod tests {
 
     #[test]
     fn paste_resets_selected_groups_the_source_leaves_default() {
-        use archroom_engine::SettingsGroup;
+        use viberoom_engine::SettingsGroup;
         let mut target = EditParams::default();
         target.set::<Exposure>(ExposureParams { ev: 1.0 });
         let source = EditParams::default();

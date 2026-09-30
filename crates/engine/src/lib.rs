@@ -1,4 +1,4 @@
-//! `archroom-engine`: the `Op` registry, edit params, raw-prep color glue
+//! `viberoom-engine`: the `Op` registry, edit params, raw-prep color glue
 //! and (from Phase B) the GPU pipeline (plan §4.1/§6).
 
 pub mod analysis;

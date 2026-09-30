@@ -1,7 +1,7 @@
 //! The histogram widget (plan §8.2): RGB overlay from the GPU's 256-bin
 //! counts, with clipping triangles that toggle the `J` overlay.
 
-use archroom_services::engine::pipeline::Histogram;
+use viberoom_services::engine::pipeline::Histogram;
 
 const HEIGHT: f32 = 80.0;
 
@@ -78,7 +78,7 @@ pub fn show(ui: &mut egui::Ui, hist: Option<&Histogram>, clip_on: bool) -> bool 
         painter.rect_stroke(
             rect,
             2.0,
-            egui::Stroke::new(1.0_f32, archroom_ui::ACCENT),
+            egui::Stroke::new(1.0_f32, viberoom_ui::ACCENT),
             egui::StrokeKind::Inside,
         );
     }

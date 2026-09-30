@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use archroom_catalog::Catalog;
-use archroom_catalog::command::Command;
-use archroom_core::events::{CatalogEvent, EventBus, PhotoField};
-use archroom_core::settings::{Settings, XmpAutoWrite};
-use archroom_jobs::Scheduler;
-use archroom_services::PreviewCache;
-use archroom_services::sidecar::SaveXmpJob;
+use viberoom_catalog::Catalog;
+use viberoom_catalog::command::Command;
+use viberoom_core::events::{CatalogEvent, EventBus, PhotoField};
+use viberoom_core::settings::{Settings, XmpAutoWrite};
+use viberoom_jobs::Scheduler;
+use viberoom_services::PreviewCache;
+use viberoom_services::sidecar::SaveXmpJob;
 
 use crate::ExportRequestKind;
 use crate::selection::Selection;
@@ -44,7 +44,7 @@ pub struct AppCx {
     /// this directly — they also publish the resulting `CatalogEvent`.
     pub undo: UndoStack,
     /// The device egui draws with, shared with the engine (plan D1).
-    pub gpu: Option<archroom_services::engine::gpu::GpuContext>,
+    pub gpu: Option<viberoom_services::engine::gpu::GpuContext>,
     /// For registering engine textures with egui.
     pub render_state: Option<RenderStateHandle>,
     export_request: Option<ExportRequestKind>,
@@ -69,7 +69,7 @@ impl AppCx {
     /// Hands over egui's wgpu device so modules can render with the engine.
     pub fn set_render_state(&mut self, rs: egui_wgpu::RenderState) {
         let name = rs.adapter.get_info().name;
-        self.gpu = Some(archroom_services::engine::gpu::GpuContext::from_parts(
+        self.gpu = Some(viberoom_services::engine::gpu::GpuContext::from_parts(
             rs.device.clone(),
             rs.queue.clone(),
             &name,
@@ -89,7 +89,7 @@ impl AppCx {
 
     /// The fill behind the photo in Loupe and Develop (Preferences).
     pub fn center_background(&self) -> egui::Color32 {
-        use archroom_core::settings::CenterBackground as Bg;
+        use viberoom_core::settings::CenterBackground as Bg;
         egui::Color32::from_gray(match self.settings.center_background {
             Bg::Black => 0x00,
             Bg::DarkGray => 0x10,
@@ -106,7 +106,7 @@ impl AppCx {
     /// undo stack, and publishes the resulting `CatalogEvent` — the one
     /// path every mutation should go through (plan §4.5). A no-op if no
     /// catalog is open.
-    pub fn apply_command(&mut self, cmd: Box<dyn Command>) -> archroom_catalog::Result<()> {
+    pub fn apply_command(&mut self, cmd: Box<dyn Command>) -> viberoom_catalog::Result<()> {
         self.apply_command_event(cmd).map(|_| ())
     }
 
@@ -116,7 +116,7 @@ impl AppCx {
     pub fn apply_command_event(
         &mut self,
         cmd: Box<dyn Command>,
-    ) -> archroom_catalog::Result<Option<CatalogEvent>> {
+    ) -> viberoom_catalog::Result<Option<CatalogEvent>> {
         let Some(catalog) = &self.catalog else {
             return Ok(None);
         };
@@ -146,13 +146,13 @@ impl AppCx {
         Ok(Some(event))
     }
 
-    pub fn undo(&mut self) -> Option<archroom_catalog::Result<()>> {
+    pub fn undo(&mut self) -> Option<viberoom_catalog::Result<()>> {
         let catalog = self.catalog.as_ref()?;
         let result = self.undo.undo(catalog.connection())?;
         Some(result.map(|event| self.events.publish(event)))
     }
 
-    pub fn redo(&mut self) -> Option<archroom_catalog::Result<()>> {
+    pub fn redo(&mut self) -> Option<viberoom_catalog::Result<()>> {
         let catalog = self.catalog.as_ref()?;
         let result = self.undo.redo(catalog.connection())?;
         Some(result.map(|event| self.events.publish(event)))

@@ -1,28 +1,28 @@
 [package]
-name = "archroom-cli"
+name = "viberoom-cli"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "archroom-cli"
+name = "viberoom-cli"
 path = "src/main.rs"
 
 [lints]
 workspace = true
 
 [dependencies]
-archroom-core = { workspace = true }
-archroom-catalog = { workspace = true }
-archroom-services = { workspace = true }
-archroom-engine = { workspace = true }
-archroom-color = { workspace = true }
-archroom-io = { workspace = true }
+viberoom-core = { workspace = true }
+viberoom-catalog = { workspace = true }
+viberoom-services = { workspace = true }
+viberoom-engine = { workspace = true }
+viberoom-color = { workspace = true }
+viberoom-io = { workspace = true }
 serde_json = { workspace = true }
 image = { version = "0.25", default-features = false, features = ["png"] }
 clap = { version = "4", features = ["derive"] }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 
-# archroom-preview joins once `export` (M5) is implemented.
+# viberoom-preview joins once `export` (M5) is implemented.

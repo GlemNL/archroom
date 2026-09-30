@@ -8,14 +8,14 @@
 //! illuminant to D65 with a CAT, then move to linear Rec.2020. Changing
 //! white balance only changes the illuminant → one 3×3, no re-demosaic.
 
-use archroom_color::Mat3d;
-use archroom_color::cat::Cat;
-use archroom_color::cie::{D65, REC2020, Xy};
-use archroom_color::temp::{temp_tint_to_xy, xy_to_temp_tint};
-use archroom_io::CameraColor;
+use viberoom_color::Mat3d;
+use viberoom_color::cat::Cat;
+use viberoom_color::cie::{D65, REC2020, Xy};
+use viberoom_color::temp::{temp_tint_to_xy, xy_to_temp_tint};
+use viberoom_io::CameraColor;
 
 /// The working space every scene/tone op runs in.
-pub const WORKING_SPACE: archroom_color::cie::Primaries = REC2020;
+pub const WORKING_SPACE: viberoom_color::cie::Primaries = REC2020;
 
 #[derive(Debug, Clone)]
 pub struct SceneColor {
@@ -85,7 +85,7 @@ impl SceneColor {
 mod tests {
     use super::*;
     use approx::assert_abs_diff_eq;
-    use archroom_color::Mat3;
+    use viberoom_color::Mat3;
 
     /// The Nikon D780 sample from `/home/clem/Downloads/_7808140.NEF`.
     fn d780() -> CameraColor {

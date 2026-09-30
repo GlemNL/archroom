@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use archroom_core::{Error, Result};
+use viberoom_core::{Error, Result};
 
 use crate::types::{DecodeOptions, DecodedImage, Decoder, ImageF32, ImageMetadata, Priority};
 

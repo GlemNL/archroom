@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use archroom_core::{Error, Result};
+use viberoom_core::{Error, Result};
 
 /// What an export embeds; the caller filters it down (copyright only, no
 /// location, keywords marked include-on-export) before it gets here.

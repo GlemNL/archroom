@@ -1,5 +1,5 @@
 [package]
-name = "archroom-services"
+name = "viberoom-services"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,14 +9,14 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-archroom-core = { workspace = true }
-archroom-catalog = { workspace = true }
-archroom-io = { workspace = true }
-archroom-engine = { workspace = true }
-archroom-color = { workspace = true }
+viberoom-core = { workspace = true }
+viberoom-catalog = { workspace = true }
+viberoom-io = { workspace = true }
+viberoom-engine = { workspace = true }
+viberoom-color = { workspace = true }
 crossbeam-channel = { workspace = true }
-archroom-preview = { workspace = true }
-archroom-jobs = { workspace = true }
+viberoom-preview = { workspace = true }
+viberoom-jobs = { workspace = true }
 rusqlite = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }

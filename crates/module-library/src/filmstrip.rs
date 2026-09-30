@@ -4,8 +4,8 @@
 //! scroll through than the Grid, so this is a fast-follow if it turns out
 //! to matter, not required for M1's virtualization goal.
 
-use archroom_services::repo::PhotoSummary;
-use archroom_shell::AppCx;
+use viberoom_services::repo::PhotoSummary;
+use viberoom_shell::AppCx;
 
 const THUMB_SIZE: f32 = 64.0;
 
@@ -15,7 +15,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut AppCx, photos: &[PhotoSummary]) {
         return;
     }
 
-    archroom_shell::wheel_scrolls_horizontally(ui);
+    viberoom_shell::wheel_scrolls_horizontally(ui);
     egui::ScrollArea::horizontal()
         .auto_shrink([false, false])
         .show(ui, |ui| {
@@ -42,12 +42,12 @@ fn show_thumb(ui: &mut egui::Ui, cx: &mut AppCx, photo: &PhotoSummary) {
         painter.rect_filled(
             rect,
             egui::CornerRadius::same(2),
-            archroom_ui::ACCENT.linear_multiply(0.25),
+            viberoom_ui::ACCENT.linear_multiply(0.25),
         );
     }
 
     let preview_path = cx.previews.as_ref().and_then(|p| {
-        p.lookup(photo.photo_id, archroom_services::LEVEL_L1)
+        p.lookup(photo.photo_id, viberoom_services::LEVEL_L1)
             .ok()
             .flatten()
     });
@@ -76,7 +76,7 @@ fn show_thumb(ui: &mut egui::Ui, cx: &mut AppCx, photo: &PhotoSummary) {
         painter.rect_stroke(
             rect,
             egui::CornerRadius::same(2),
-            egui::Stroke::new(2.0_f32, archroom_ui::ACCENT),
+            egui::Stroke::new(2.0_f32, viberoom_ui::ACCENT),
             egui::StrokeKind::Inside,
         );
     }

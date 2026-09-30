@@ -1,4 +1,4 @@
-//! `archroom-shell`: the contract between the `app` binary and the module
+//! `viberoom-shell`: the contract between the `app` binary and the module
 //! crates (`Module`, `AppCx`, `ModuleRegistry`). Split out from `services`
 //! (which must stay UI-agnostic, plan principle 6) and from `ui-kit` (which
 //! must stay a dependency-light widget crate, plan §4.2) because `Module`

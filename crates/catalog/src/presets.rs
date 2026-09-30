@@ -1,6 +1,6 @@
 //! User presets (plan §8.1). The catalog stores opaque JSON (the settings
 //! groups a preset applies and the params it takes them from); the meaning
-//! lives in `archroom-services`.
+//! lives in `viberoom-services`.
 
 use rusqlite::{Connection, params};
 

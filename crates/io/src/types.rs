@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use archroom_color::Mat3;
+use viberoom_color::Mat3;
 
 /// A linear-light f32 image buffer, interleaved RGB(A).
 #[derive(Debug, Clone)]
@@ -70,7 +70,7 @@ pub struct DecodeOptions {
 pub trait Decoder: Send + Sync {
     fn id(&self) -> &'static str;
     fn probe(&self, path: &Path, header: &[u8]) -> Option<Priority>;
-    fn metadata(&self, path: &Path) -> archroom_core::Result<ImageMetadata>;
-    fn embedded_preview(&self, path: &Path) -> archroom_core::Result<Option<Vec<u8>>>;
-    fn decode(&self, path: &Path, opts: &DecodeOptions) -> archroom_core::Result<DecodedImage>;
+    fn metadata(&self, path: &Path) -> viberoom_core::Result<ImageMetadata>;
+    fn embedded_preview(&self, path: &Path) -> viberoom_core::Result<Option<Vec<u8>>>;
+    fn decode(&self, path: &Path, opts: &DecodeOptions) -> viberoom_core::Result<DecodedImage>;
 }

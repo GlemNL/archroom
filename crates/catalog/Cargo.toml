@@ -1,5 +1,5 @@
 [package]
-name = "archroom-catalog"
+name = "viberoom-catalog"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,7 +9,7 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-archroom-core = { workspace = true }
+viberoom-core = { workspace = true }
 rusqlite = { workspace = true }
 rusqlite_migration = { workspace = true }
 serde = { workspace = true }

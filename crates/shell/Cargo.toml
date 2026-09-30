@@ -1,5 +1,5 @@
 [package]
-name = "archroom-shell"
+name = "viberoom-shell"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,11 +9,11 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-archroom-core = { workspace = true }
-archroom-catalog = { workspace = true }
-archroom-jobs = { workspace = true }
-archroom-services = { workspace = true }
-archroom-ui = { workspace = true }
+viberoom-core = { workspace = true }
+viberoom-catalog = { workspace = true }
+viberoom-jobs = { workspace = true }
+viberoom-services = { workspace = true }
+viberoom-ui = { workspace = true }
 tracing = { workspace = true }
 egui = "0.33"
 rfd = "0.15"

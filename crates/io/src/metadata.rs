@@ -7,7 +7,7 @@
 use std::path::Path;
 use std::sync::Once;
 
-use archroom_core::{Error, Result};
+use viberoom_core::{Error, Result};
 
 use crate::types::ImageMetadata;
 

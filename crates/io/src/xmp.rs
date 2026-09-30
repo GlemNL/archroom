@@ -11,7 +11,7 @@
 use std::path::Path;
 use std::sync::Once;
 
-use archroom_core::{Error, Result};
+use viberoom_core::{Error, Result};
 
 static REXIV2_INIT: Once = Once::new();
 static NAMESPACE_INIT: Once = Once::new();
@@ -28,13 +28,13 @@ fn ensure_rexiv2_initialized() {
     });
 }
 
-const ARCHROOM_NS_URI: &str = "https://archroom.app/xmp/1.0/";
-const ARCHROOM_NS_PREFIX: &str = "archroom";
+const VIBEROOM_NS_URI: &str = "https://viberoom.app/xmp/1.0/";
+const VIBEROOM_NS_PREFIX: &str = "viberoom";
 
-fn ensure_archroom_namespace_registered() {
+fn ensure_viberoom_namespace_registered() {
     NAMESPACE_INIT.call_once(|| {
-        if let Err(e) = rexiv2::register_xmp_namespace(ARCHROOM_NS_URI, ARCHROOM_NS_PREFIX) {
-            tracing::warn!(error = %e, "register_xmp_namespace(archroom) failed");
+        if let Err(e) = rexiv2::register_xmp_namespace(VIBEROOM_NS_URI, VIBEROOM_NS_PREFIX) {
+            tracing::warn!(error = %e, "register_xmp_namespace(viberoom) failed");
         }
     });
 }
@@ -102,7 +102,7 @@ fn to_rexiv2_error(context: &str, e: rexiv2::Rexiv2Error) -> Error {
 /// on it to remove a value a *previous* `write_sidecar` call persisted.
 pub fn write_sidecar(path: &Path, data: &SidecarData) -> Result<()> {
     ensure_rexiv2_initialized();
-    ensure_archroom_namespace_registered();
+    ensure_viberoom_namespace_registered();
 
     if !path.exists() {
         std::fs::write(path, EMPTY_XMP_PACKET).map_err(|e| Error::io(path, e))?;
@@ -122,10 +122,10 @@ pub fn write_sidecar(path: &Path, data: &SidecarData) -> Result<()> {
 
     match data.flag {
         Some(f) => meta
-            .set_tag_numeric("Xmp.archroom.Flag", f)
-            .map_err(|e| to_rexiv2_error("set Xmp.archroom.Flag", e))?,
+            .set_tag_numeric("Xmp.viberoom.Flag", f)
+            .map_err(|e| to_rexiv2_error("set Xmp.viberoom.Flag", e))?,
         None => {
-            meta.clear_tag("Xmp.archroom.Flag");
+            meta.clear_tag("Xmp.viberoom.Flag");
         }
     }
 
@@ -181,7 +181,7 @@ fn set_or_clear_string(meta: &rexiv2::Metadata, tag: &str, value: Option<&str>) 
 /// error.
 pub fn read_sidecar(path: &Path) -> Result<SidecarData> {
     ensure_rexiv2_initialized();
-    ensure_archroom_namespace_registered();
+    ensure_viberoom_namespace_registered();
 
     let meta = rexiv2::Metadata::new_from_path(path)
         .map_err(|e| to_rexiv2_error(&format!("xmp open {}", path.display()), e))?;
@@ -190,8 +190,8 @@ pub fn read_sidecar(path: &Path) -> Result<SidecarData> {
         .has_tag("Xmp.xmp.Rating")
         .then(|| meta.get_tag_numeric("Xmp.xmp.Rating"));
     let flag = meta
-        .has_tag("Xmp.archroom.Flag")
-        .then(|| meta.get_tag_numeric("Xmp.archroom.Flag"));
+        .has_tag("Xmp.viberoom.Flag")
+        .then(|| meta.get_tag_numeric("Xmp.viberoom.Flag"));
     let color_label = non_empty(meta.get_tag_string("Xmp.xmp.Label").ok());
     let keywords = meta
         .get_tag_multiple_strings("Xmp.dc.subject")

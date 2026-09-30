@@ -2,11 +2,11 @@ set shell := ["bash", "-uc"]
 
 # Run the app.
 run:
-    cargo run -p archroom-app
+    cargo run -p viberoom-app
 
 # Run the CLI (`just cli -- catalog check /tmp/test.arcat`).
 cli *ARGS:
-    cargo run -p archroom-cli -- {{ARGS}}
+    cargo run -p viberoom-cli -- {{ARGS}}
 
 # Run every test in the workspace.
 test:
@@ -38,7 +38,7 @@ fixtures:
 # Re-bless golden-image references after an intentional rendering change
 # (plan §13): rewrites tests/golden/*.png; review the diff before committing.
 bless:
-    ARCHROOM_BLESS=1 cargo test -p archroom-engine --test golden
+    VIBEROOM_BLESS=1 cargo test -p viberoom-engine --test golden
 
 # Everything CI runs.
 ci: lint test

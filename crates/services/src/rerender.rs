@@ -5,14 +5,14 @@
 
 use std::path::PathBuf;
 
-use archroom_catalog::repo::PhotoFileInfo;
-use archroom_core::ids::PhotoId;
-use archroom_engine::gpu::GpuContext;
-use archroom_engine::pipeline::{Pipeline, RenderRequest};
-use archroom_engine::{EditParams, Orientation};
-use archroom_io::DecodeOptions;
-use archroom_jobs::{Job, JobContext, Priority};
-use archroom_preview::{
+use viberoom_catalog::repo::PhotoFileInfo;
+use viberoom_core::ids::PhotoId;
+use viberoom_engine::gpu::GpuContext;
+use viberoom_engine::pipeline::{Pipeline, RenderRequest};
+use viberoom_engine::{EditParams, Orientation};
+use viberoom_io::DecodeOptions;
+use viberoom_jobs::{Job, JobContext, Priority};
+use viberoom_preview::{
     L1_BUDGET_PX, LEVEL_L1, LEVEL_L2, PreviewCache, encode_jpeg_from_rgba8, l2_budget_px,
 };
 
@@ -48,7 +48,7 @@ pub fn rerender(
         }
         return Ok(());
     }
-    let decoder = archroom_io::decoder_for(&info.path)
+    let decoder = viberoom_io::decoder_for(&info.path)
         .ok_or_else(|| Error::Other(format!("no decoder for {}", info.path.display())))?;
     let decoded = decoder.decode(&info.path, &DecodeOptions::default())?;
     let mut pipeline = Pipeline::new(gpu, &decoded).map_err(|e| Error::Other(e.to_string()))?;
@@ -108,7 +108,7 @@ mod tests {
     fn hash_differs_between_edits() {
         let a = EditParams::default();
         let mut b = EditParams::default();
-        b.set::<archroom_engine::ops::Exposure>(archroom_engine::ops::ExposureParams { ev: 1.0 });
+        b.set::<viberoom_engine::ops::Exposure>(viberoom_engine::ops::ExposureParams { ev: 1.0 });
         assert_ne!(params_hash_i64(&a), params_hash_i64(&b));
     }
 }

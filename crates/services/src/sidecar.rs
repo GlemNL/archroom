@@ -8,11 +8,11 @@
 
 use std::path::{Path, PathBuf};
 
-use archroom_catalog::Catalog;
-use archroom_catalog::repo;
-use archroom_core::ids::PhotoId;
-use archroom_io::xmp::{self, SidecarData};
-use archroom_jobs::{Job, JobContext, Priority};
+use viberoom_catalog::Catalog;
+use viberoom_catalog::repo;
+use viberoom_core::ids::PhotoId;
+use viberoom_io::xmp::{self, SidecarData};
+use viberoom_jobs::{Job, JobContext, Priority};
 use rusqlite::Connection;
 
 use crate::error::Result;
@@ -81,7 +81,7 @@ pub fn save_metadata_to_xmp(conn: &Connection, photo_ids: &[PhotoId]) -> Result<
 pub fn apply_sidecar_on_import(
     conn: &Connection,
     photo_id: PhotoId,
-    file_id: archroom_core::ids::FileId,
+    file_id: viberoom_core::ids::FileId,
     image_path: &Path,
 ) -> Result<bool> {
     let candidates = [
@@ -125,7 +125,7 @@ pub fn apply_sidecar_on_import(
     Ok(true)
 }
 
-/// Runs [`save_metadata_to_xmp`] as an `archroom-jobs` background job
+/// Runs [`save_metadata_to_xmp`] as an `viberoom-jobs` background job
 /// (plan §4.6: XMP writes never block the UI thread). `Ctrl+S` and the
 /// auto-write preference both submit this; it opens its own connection to
 /// the catalog file, like the import job does.
@@ -176,8 +176,8 @@ impl Job for SaveXmpJob {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use archroom_catalog::repo;
-    use archroom_core::ids::FileId;
+    use viberoom_catalog::repo;
+    use viberoom_core::ids::FileId;
 
     /// A photo whose file lives in `dir`, so sidecars land next to it.
     /// The image itself doesn't need to exist — sidecars are written from
@@ -265,7 +265,7 @@ mod tests {
     fn apply_sidecar_on_import_brings_metadata_and_keywords_into_the_catalog() {
         let dir = tempfile::tempdir().unwrap();
 
-        // A sidecar some other app (or a previous Archroom session) left
+        // A sidecar some other app (or a previous Viberoom session) left
         // behind, checked first so the reader can't echo our own writes.
         xmp::write_sidecar(
             &dir.path().join("img.xmp"),

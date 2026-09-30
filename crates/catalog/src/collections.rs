@@ -2,7 +2,7 @@
 //! Quick Collection and smart collections, plus the one filtered photo
 //! query the Grid uses for every source (folder, import, collection, all).
 
-use archroom_core::ids::{CollectionId, FolderId, ImportId, PhotoId};
+use viberoom_core::ids::{CollectionId, FolderId, ImportId, PhotoId};
 use rusqlite::types::Value;
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 

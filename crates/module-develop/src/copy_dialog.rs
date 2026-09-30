@@ -1,7 +1,7 @@
 //! The Copy… / Sync… group-selection dialog (plan §8.4).
 
-use archroom_services::engine::{EditParams, Registry, SettingsGroup};
-use archroom_shell::AppCx;
+use viberoom_services::engine::{EditParams, Registry, SettingsGroup};
+use viberoom_shell::AppCx;
 
 use crate::{Clipboard, DevelopModule};
 

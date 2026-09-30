@@ -13,11 +13,11 @@
 
 use std::path::PathBuf;
 
-use archroom_core::events::CatalogEvent;
-use archroom_core::ids::ImportId;
-use archroom_services::JobHandle;
-use archroom_services::import::{ImportJob, ImportMode, ImportOptions};
-use archroom_shell::AppCx;
+use viberoom_core::events::CatalogEvent;
+use viberoom_core::ids::ImportId;
+use viberoom_services::JobHandle;
+use viberoom_services::import::{ImportJob, ImportMode, ImportOptions};
+use viberoom_shell::AppCx;
 use crossbeam_channel::Receiver;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

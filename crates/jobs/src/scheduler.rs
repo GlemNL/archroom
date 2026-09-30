@@ -127,7 +127,7 @@ impl Scheduler {
                 let events_tx = events_tx.clone();
                 #[allow(clippy::expect_used)] // unrecoverable at startup; nothing to fall back to
                 std::thread::Builder::new()
-                    .name(format!("archroom-job-{i}"))
+                    .name(format!("viberoom-job-{i}"))
                     .spawn(move || worker_loop(shared, events_tx))
                     .expect("failed to spawn job worker thread")
             })

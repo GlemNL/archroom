@@ -9,10 +9,10 @@
 //! benchmark) before its first paint. A background-job-based prefetch is a
 //! fast-follow, not required for M1 Phase C.
 
-use archroom_core::ids::PhotoId;
-use archroom_core::settings::ClickZoom;
-use archroom_services::repo::{FolderRow, PhotoSummary};
-use archroom_shell::AppCx;
+use viberoom_core::ids::PhotoId;
+use viberoom_core::settings::ClickZoom;
+use viberoom_services::repo::{FolderRow, PhotoSummary};
+use viberoom_shell::AppCx;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Zoom {
@@ -68,12 +68,12 @@ pub fn show(
     };
 
     let preview_path = cx.previews.as_ref().and_then(|previews| {
-        match archroom_services::preview::ensure_cached(
+        match viberoom_services::preview::ensure_cached(
             previews,
             &path,
             photo.photo_id,
-            archroom_services::LEVEL_L2,
-            archroom_services::l2_budget_px(),
+            viberoom_services::LEVEL_L2,
+            viberoom_services::l2_budget_px(),
         ) {
             Ok(p) => Some(p),
             Err(e) => {

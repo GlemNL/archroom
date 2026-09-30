@@ -2,20 +2,20 @@
 //! the real GPU pipeline under a set of edit params and compared with the
 //! blessed PNGs in `tests/golden/`. The chart is generated in code, so the
 //! suite needs no raw fixtures and runs anywhere a Vulkan device (or
-//! lavapipe: `ARCHROOM_ADAPTER=llvmpipe`) exists.
+//! lavapipe: `VIBEROOM_ADAPTER=llvmpipe`) exists.
 //!
 //! Re-bless after an *intentional* rendering change: `just bless`
-//! (`ARCHROOM_BLESS=1`), then review the PNG diffs in git.
+//! (`VIBEROOM_BLESS=1`), then review the PNG diffs in git.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::PathBuf;
 
-use archroom_color::cie::SRGB;
-use archroom_engine::EditParams;
-use archroom_engine::gpu::GpuContext;
-use archroom_engine::pipeline::{Pipeline, RenderRequest};
-use archroom_io::{CameraColor, DecodedImage, ImageF32};
+use viberoom_color::cie::SRGB;
+use viberoom_engine::EditParams;
+use viberoom_engine::gpu::GpuContext;
+use viberoom_engine::pipeline::{Pipeline, RenderRequest};
+use viberoom_io::{CameraColor, DecodedImage, ImageF32};
 
 const W: u32 = 384;
 const H: u32 = 256;
@@ -166,7 +166,7 @@ fn renders_match_the_blessed_references() {
     };
     eprintln!("golden suite on {}", gpu.adapter_name);
     let mut pipeline = Pipeline::new(&gpu, &chart()).expect("pipeline");
-    let bless = std::env::var_os("ARCHROOM_BLESS").is_some();
+    let bless = std::env::var_os("VIBEROOM_BLESS").is_some();
     let mut failures = Vec::new();
 
     for (name, json) in CASES {

@@ -6,9 +6,9 @@
 //! sets rating/flag/label yet (that's M2); the point is the Grid doesn't
 //! need to change when M2 lands.
 
-use archroom_core::ids::PhotoId;
-use archroom_services::repo::PhotoSummary;
-use archroom_shell::AppCx;
+use viberoom_core::ids::PhotoId;
+use viberoom_services::repo::PhotoSummary;
+use viberoom_shell::AppCx;
 use egui::{Color32, CornerRadius, Sense, Stroke, Vec2};
 
 const LABEL_HEIGHT: f32 = 20.0;
@@ -92,14 +92,14 @@ fn show_cell(
         painter.rect_filled(
             rect,
             CornerRadius::same(3),
-            archroom_ui::ACCENT.linear_multiply(0.25),
+            viberoom_ui::ACCENT.linear_multiply(0.25),
         );
     }
     if is_active {
         painter.rect_stroke(
             rect,
             CornerRadius::same(3),
-            Stroke::new(2.0_f32, archroom_ui::ACCENT),
+            Stroke::new(2.0_f32, viberoom_ui::ACCENT),
             egui::StrokeKind::Inside,
         );
     }
@@ -108,7 +108,7 @@ fn show_cell(
         egui::Rect::from_min_size(rect.min + Vec2::splat(CELL_PADDING), Vec2::splat(size));
 
     let preview_path = cx.previews.as_ref().and_then(|p| {
-        p.lookup(photo.photo_id, archroom_services::LEVEL_L1)
+        p.lookup(photo.photo_id, viberoom_services::LEVEL_L1)
             .ok()
             .flatten()
     });

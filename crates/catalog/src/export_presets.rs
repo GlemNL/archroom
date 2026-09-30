@@ -1,5 +1,5 @@
 //! User export presets (plan §9). The catalog stores each preset's settings
-//! as opaque JSON; `archroom-services::export` owns their meaning.
+//! as opaque JSON; `viberoom-services::export` owns their meaning.
 
 use rusqlite::{Connection, params};
 

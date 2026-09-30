@@ -1,4 +1,4 @@
-//! `archroom-color`: color math (plan §6.4/§6.9): matrices, xy/XYZ, Temp/Tint
+//! `viberoom-color`: color math (plan §6.4/§6.9): matrices, xy/XYZ, Temp/Tint
 //! (Robertson), CAT16/Bradford chromatic adaptation, OkLab, transfer
 //! functions and the `lcms2` wrapper with a 3D LUT builder.
 //!

@@ -54,7 +54,7 @@ impl RenderLoop {
         });
         let worker_shared = Arc::clone(&shared);
         let worker = std::thread::Builder::new()
-            .name("archroom-render".into())
+            .name("viberoom-render".into())
             .spawn(move || {
                 loop {
                     let (id, req) = {
@@ -142,8 +142,8 @@ mod tests {
     use crate::gpu::GpuContext;
     use crate::ops::{Exposure, ExposureParams};
     use crate::params::EditParams;
-    use archroom_color::cie::SRGB;
-    use archroom_io::{CameraColor, DecodedImage, ImageF32};
+    use viberoom_color::cie::SRGB;
+    use viberoom_io::{CameraColor, DecodedImage, ImageF32};
     use std::time::{Duration, Instant};
 
     #[test]

@@ -20,7 +20,7 @@ side-by-side comparisons on the golden image set (§13).
 
 ## Consequences
 
-- `archroom-color` implements both matrices; the debug switch is a cheap
+- `viberoom-color` implements both matrices; the debug switch is a cheap
   runtime toggle, not two code paths to maintain.
 - M3's image-quality tuning pass (§11, M4 exit) should include a CAT16 vs.
   Bradford comparison on the golden set as part of validating this choice.

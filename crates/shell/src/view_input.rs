@@ -1,6 +1,6 @@
 //! Small input helpers shared by Library and Develop.
 
-use archroom_core::settings::ClickZoom;
+use viberoom_core::settings::ClickZoom;
 
 use crate::AppCx;
 

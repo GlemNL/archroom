@@ -2,10 +2,10 @@
 //! pan, before/after, clipping overlay and the white-balance eyedropper,
 //! plus the toolbar and Develop's keyboard shortcuts.
 
-use archroom_core::settings::ClickZoom;
-use archroom_services::LEVEL_L2;
-use archroom_services::engine::ops::{WbMode, WhiteBalance, WhiteBalanceParams};
-use archroom_shell::AppCx;
+use viberoom_core::settings::ClickZoom;
+use viberoom_services::LEVEL_L2;
+use viberoom_services::engine::ops::{WbMode, WhiteBalance, WhiteBalanceParams};
+use viberoom_shell::AppCx;
 use egui::Modifiers;
 
 use crate::basic::Change;
@@ -43,7 +43,7 @@ pub fn toolbar(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
             m.pan = egui::Vec2::ZERO;
         }
     }
-    archroom_shell::click_zoom_picker(ui, cx);
+    viberoom_shell::click_zoom_picker(ui, cx);
     ui.separator();
     let mut tool_on = m.crop_tool.is_some();
     if ui
@@ -64,8 +64,8 @@ pub fn toolbar(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
     ui.separator();
     let (can_undo, can_redo) = m.doc.as_ref().map_or((false, false), |d| {
         (
-            archroom_services::develop::undo_target(&d.history, d.cursor).is_some(),
-            archroom_services::develop::redo_target(&d.history, d.cursor).is_some(),
+            viberoom_services::develop::undo_target(&d.history, d.cursor).is_some(),
+            viberoom_services::develop::redo_target(&d.history, d.cursor).is_some(),
         )
     });
     if ui
@@ -90,7 +90,7 @@ pub fn toolbar(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
         {
             // The export reads the catalog, so write pending edits first.
             m.flush(cx);
-            cx.request_export(archroom_shell::ExportRequestKind::Dialog);
+            cx.request_export(viberoom_shell::ExportRequestKind::Dialog);
         }
     });
 }
@@ -168,7 +168,7 @@ fn handle_keys(ctx: &egui::Context, m: &mut DevelopModule, cx: &mut AppCx) {
     if x && let (Some(tool), Some(doc)) = (&mut m.crop_tool, &m.doc)
         && let Some(session) = &doc.session
     {
-        let canvas = archroom_services::engine::geometry::resolve(
+        let canvas = viberoom_services::engine::geometry::resolve(
             session.source_size,
             session.orientation,
             &doc.params,
@@ -287,11 +287,11 @@ pub fn show(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
     // The layout follows what is rendered: the crop, or the whole canvas
     // while the crop tool is open.
     let shown = if m.before {
-        archroom_services::engine::EditParams::default()
+        viberoom_services::engine::EditParams::default()
     } else {
         doc.params.clone()
     };
-    let geom = archroom_services::engine::geometry::resolve(
+    let geom = viberoom_services::engine::geometry::resolve(
         session.source_size,
         session.orientation,
         &shown,

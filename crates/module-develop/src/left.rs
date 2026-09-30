@@ -1,7 +1,7 @@
 //! The Develop left panel (plan §8.1): Navigator, Presets, Snapshots and
 //! History, plus the copy/paste/sync/reset actions.
 
-use archroom_shell::AppCx;
+use viberoom_shell::AppCx;
 
 use crate::copy_dialog::{CopyDialog, Mode};
 use crate::{DevelopModule, history, navigator, presets_panel};

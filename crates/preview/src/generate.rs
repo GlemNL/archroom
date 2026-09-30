@@ -8,7 +8,7 @@
 
 use std::sync::atomic::{AtomicU8, AtomicU32, Ordering};
 
-use archroom_io::ImageF32;
+use viberoom_io::ImageF32;
 use fast_image_resize::images::Image as FirImage;
 use fast_image_resize::{IntoImageView, Resizer};
 use image::{DynamicImage, ExtendedColorType, ImageEncoder};

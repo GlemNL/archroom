@@ -4,7 +4,7 @@
 pub mod encode;
 pub mod job;
 
-pub use archroom_color::icc::OutputSpace;
+pub use viberoom_color::icc::OutputSpace;
 
 use std::path::{Path, PathBuf};
 
@@ -188,7 +188,7 @@ pub fn builtin_presets() -> Vec<ExportPreset> {
 const LAST_KEY: &str = "\u{1}last";
 
 pub fn load_last(conn: &Connection) -> Option<ExportSettings> {
-    archroom_catalog::export_presets::list(conn)
+    viberoom_catalog::export_presets::list(conn)
         .ok()?
         .into_iter()
         .find(|(name, _)| name == LAST_KEY)
@@ -197,14 +197,14 @@ pub fn load_last(conn: &Connection) -> Option<ExportSettings> {
 
 pub fn save_last(conn: &Connection, settings: &ExportSettings) -> Result<()> {
     let json = serde_json::to_string(settings).map_err(|e| Error::Other(e.to_string()))?;
-    archroom_catalog::export_presets::save(conn, LAST_KEY, &json)?;
+    viberoom_catalog::export_presets::save(conn, LAST_KEY, &json)?;
     Ok(())
 }
 
 /// Built-ins first, then the catalog's saved presets.
 pub fn all_presets(conn: &Connection) -> Result<Vec<ExportPreset>> {
     let mut presets = builtin_presets();
-    for (name, json) in archroom_catalog::export_presets::list(conn)? {
+    for (name, json) in viberoom_catalog::export_presets::list(conn)? {
         if name == LAST_KEY {
             continue;
         }
@@ -229,12 +229,12 @@ pub fn save_preset(conn: &Connection, name: &str, settings: &ExportSettings) -> 
         return Err(Error::Other(format!("\"{name}\" is a built-in preset")));
     }
     let json = serde_json::to_string(settings).map_err(|e| Error::Other(e.to_string()))?;
-    archroom_catalog::export_presets::save(conn, name, &json)?;
+    viberoom_catalog::export_presets::save(conn, name, &json)?;
     Ok(())
 }
 
 pub fn delete_preset(conn: &Connection, name: &str) -> Result<()> {
-    archroom_catalog::export_presets::delete(conn, name)?;
+    viberoom_catalog::export_presets::delete(conn, name)?;
     Ok(())
 }
 
@@ -502,7 +502,7 @@ mod tests {
     #[test]
     fn presets_round_trip_and_builtins_are_protected() {
         let dir = tempfile::tempdir().unwrap();
-        let cat = archroom_catalog::Catalog::create_or_open(dir.path().join("t.arcat")).unwrap();
+        let cat = viberoom_catalog::Catalog::create_or_open(dir.path().join("t.arcat")).unwrap();
         let conn = cat.connection();
         assert_eq!(all_presets(conn).unwrap().len(), 3);
         let s = ExportSettings {

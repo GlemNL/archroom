@@ -4,9 +4,9 @@
 
 use std::path::{Path, PathBuf};
 
-use archroom_core::ids::PhotoId;
-use archroom_io::{DecodeOptions, DecodedImage, decoder_for};
-use archroom_preview::{
+use viberoom_core::ids::PhotoId;
+use viberoom_io::{DecodeOptions, DecodedImage, decoder_for};
+use viberoom_preview::{
     DEFAULT_PARAMS_HASH, PreviewCache, generate_preview_from_display_rgb,
     generate_preview_from_jpeg_bytes, generate_preview_from_linear_rgb,
 };
@@ -77,7 +77,7 @@ pub fn ensure_cached(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use archroom_preview::LEVEL_L2;
+    use viberoom_preview::LEVEL_L2;
 
     fn make_test_png(dir: &Path) -> PathBuf {
         let path = dir.join("a.png");
@@ -115,17 +115,17 @@ pub struct TrimPreviewsJob {
     pub budget_bytes: u64,
 }
 
-impl archroom_jobs::Job for TrimPreviewsJob {
+impl viberoom_jobs::Job for TrimPreviewsJob {
     fn label(&self) -> String {
         "Tidying the preview cache".to_string()
     }
 
-    fn priority(&self) -> archroom_jobs::Priority {
-        archroom_jobs::Priority::Background
+    fn priority(&self) -> viberoom_jobs::Priority {
+        viberoom_jobs::Priority::Background
     }
 
-    fn run(self: Box<Self>, _cx: &archroom_jobs::JobContext) {
-        match archroom_preview::PreviewCache::open_for_catalog(&self.catalog_path)
+    fn run(self: Box<Self>, _cx: &viberoom_jobs::JobContext) {
+        match viberoom_preview::PreviewCache::open_for_catalog(&self.catalog_path)
             .and_then(|cache| cache.trim(self.budget_bytes))
         {
             Ok(0) => {}
