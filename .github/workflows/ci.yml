@@ -42,8 +42,8 @@ jobs:
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   # The app crate has no tests and pulls in eframe/winit (~150 crates), so the
-  # test job skips it (clippy still covers it), along with the display
-  # libraries it links.
+  # test job skips it (clippy still covers it). libwayland-dev is still
+  # needed: rfd (shell and modules) links wayland-sys via ashpd.
   test:
     name: Test
     runs-on: ubuntu-24.04
