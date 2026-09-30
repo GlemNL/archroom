@@ -15,7 +15,7 @@ mod right_panel;
 mod shortcuts;
 
 use archroom_services::command::{RotatePhotos, SetFlag};
-use archroom_shell::{AppCx, Module, ModuleId};
+use archroom_shell::{AppCx, ExportRequestKind, Module, ModuleId};
 use import_dialog::ImportDialogState;
 use photos::LibraryData;
 use right_panel::RightPanelState;
@@ -181,6 +181,17 @@ impl Module for LibraryModule {
                 .clicked()
             {
                 self.import_dialog = Some(ImportDialogState::open(cx));
+            }
+            let has_target = cx.selection.selected_count() > 0 || cx.selection.active.is_some();
+            if ui
+                .add_enabled(
+                    cx.catalog_open() && has_target,
+                    egui::Button::new("Export…"),
+                )
+                .on_hover_text("Ctrl+Shift+E")
+                .clicked()
+            {
+                cx.request_export(ExportRequestKind::Dialog);
             }
         });
     }

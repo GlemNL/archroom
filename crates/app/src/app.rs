@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use archroom_catalog::Catalog;
 use archroom_jobs::{JobEventKind, Scheduler};
-use archroom_shell::{AppCx, ModuleRegistry};
+use archroom_shell::{AppCx, ExportRequestKind, ExportUi, ModuleRegistry};
 use crossbeam_channel::Receiver;
 use tracing::{error, info};
 
@@ -31,6 +31,7 @@ pub struct ArchroomApp {
     show_side_panels: bool,
     show_spike_window: bool,
     spike_view: SpikeView,
+    export_ui: ExportUi,
 }
 
 impl ArchroomApp {
@@ -102,6 +103,7 @@ impl ArchroomApp {
             show_side_panels: true,
             show_spike_window: false,
             spike_view: SpikeView::default(),
+            export_ui: ExportUi::default(),
         }
     }
 
@@ -127,6 +129,30 @@ impl ArchroomApp {
         // only undo stack that exists yet (Develop's is separate, persisted
         // per-photo history, M3 work), so this always targets it; harmless
         // in Develop today since nothing pushes to it from there.
+        // Ctrl+Shift+E opens Export; Ctrl+Alt+Shift+E repeats the last one.
+        // (`consume_shortcut` checks the modifiers held when the key event
+        // happened, and the more specific shortcut goes first.)
+        let export_kind = ctx.input_mut(|i| {
+            let with_previous = egui::KeyboardShortcut::new(
+                egui::Modifiers::COMMAND | egui::Modifiers::SHIFT | egui::Modifiers::ALT,
+                egui::Key::E,
+            );
+            let dialog = egui::KeyboardShortcut::new(
+                egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
+                egui::Key::E,
+            );
+            if i.consume_shortcut(&with_previous) {
+                Some(ExportRequestKind::WithPrevious)
+            } else if i.consume_shortcut(&dialog) {
+                Some(ExportRequestKind::Dialog)
+            } else {
+                None
+            }
+        });
+        if let Some(kind) = export_kind {
+            self.cx.request_export(kind);
+        }
+
         let (undo_pressed, redo_pressed, save_pressed) = ctx.input(|i| {
             let cmd = i.modifiers.command;
             let undo = cmd && !i.modifiers.shift && i.key_pressed(egui::Key::Z);
@@ -231,6 +257,8 @@ impl eframe::App for ArchroomApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             self.registry.active_mut().center(ui, &mut self.cx);
         });
+
+        self.export_ui.show(ctx, &mut self.cx);
 
         if self.show_spike_window {
             if let Some(render_state) = frame.wgpu_render_state().cloned() {

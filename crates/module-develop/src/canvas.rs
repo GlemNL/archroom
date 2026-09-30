@@ -82,6 +82,17 @@ pub fn toolbar(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
     {
         m.walk(cx, true);
     }
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+        if ui
+            .add_enabled(m.doc.is_some(), egui::Button::new("Export…"))
+            .on_hover_text("Ctrl+Shift+E")
+            .clicked()
+        {
+            // The export reads the catalog, so write pending edits first.
+            m.flush(cx);
+            cx.request_export(archroom_shell::ExportRequestKind::Dialog);
+        }
+    });
 }
 
 /// True only while a `TextEdit` has focus. `wants_keyboard_input` is true

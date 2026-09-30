@@ -7,6 +7,7 @@
 //! without depending on the binary that depends on them.
 
 mod appcx;
+mod export_ui;
 mod module;
 mod registry;
 mod selection;
@@ -14,6 +15,7 @@ mod undo;
 mod view_input;
 
 pub use appcx::{AppCx, RenderStateHandle};
+pub use export_ui::{ExportRequestKind, ExportUi};
 pub use module::{Action, Module, ModuleId};
 pub use registry::ModuleRegistry;
 pub use selection::{LibrarySource, Selection};

@@ -16,6 +16,9 @@ archroom-services = { workspace = true }
 archroom-ui = { workspace = true }
 tracing = { workspace = true }
 egui = "0.33"
+rfd = "0.15"
+crossbeam-channel = { workspace = true }
+open = "5"
 egui-wgpu = "0.33"
 rusqlite = { workspace = true }
 

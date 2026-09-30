@@ -4,9 +4,10 @@
 pub mod encode;
 pub mod job;
 
+pub use archroom_color::icc::OutputSpace;
+
 use std::path::{Path, PathBuf};
 
-use archroom_color::icc::OutputSpace;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
@@ -182,10 +183,31 @@ pub fn builtin_presets() -> Vec<ExportPreset> {
     ]
 }
 
+/// The reserved preset name that remembers the last export's settings
+/// ("Export with Previous", and what the dialog opens with).
+const LAST_KEY: &str = "\u{1}last";
+
+pub fn load_last(conn: &Connection) -> Option<ExportSettings> {
+    archroom_catalog::export_presets::list(conn)
+        .ok()?
+        .into_iter()
+        .find(|(name, _)| name == LAST_KEY)
+        .and_then(|(_, json)| serde_json::from_str(&json).ok())
+}
+
+pub fn save_last(conn: &Connection, settings: &ExportSettings) -> Result<()> {
+    let json = serde_json::to_string(settings).map_err(|e| Error::Other(e.to_string()))?;
+    archroom_catalog::export_presets::save(conn, LAST_KEY, &json)?;
+    Ok(())
+}
+
 /// Built-ins first, then the catalog's saved presets.
 pub fn all_presets(conn: &Connection) -> Result<Vec<ExportPreset>> {
     let mut presets = builtin_presets();
     for (name, json) in archroom_catalog::export_presets::list(conn)? {
+        if name == LAST_KEY {
+            continue;
+        }
         match serde_json::from_str(&json) {
             Ok(settings) => presets.push(ExportPreset {
                 name,
@@ -203,7 +225,7 @@ pub fn save_preset(conn: &Connection, name: &str, settings: &ExportSettings) -> 
     if name.is_empty() {
         return Err(Error::Other("a preset needs a name".into()));
     }
-    if builtin_presets().iter().any(|p| p.name == name) {
+    if name == LAST_KEY || builtin_presets().iter().any(|p| p.name == name) {
         return Err(Error::Other(format!("\"{name}\" is a built-in preset")));
     }
     let json = serde_json::to_string(settings).map_err(|e| Error::Other(e.to_string()))?;
@@ -494,6 +516,12 @@ mod tests {
         assert!(save_preset(conn, "JPEG sRGB full size", &s).is_err());
         assert!(save_preset(conn, "  ", &s).is_err());
         delete_preset(conn, "Mine").unwrap();
+        assert_eq!(all_presets(conn).unwrap().len(), 3);
+
+        // The remembered "last" settings never show up as a preset.
+        assert_eq!(load_last(conn), None);
+        save_last(conn, &s).unwrap();
+        assert_eq!(load_last(conn), Some(s));
         assert_eq!(all_presets(conn).unwrap().len(), 3);
     }
 }

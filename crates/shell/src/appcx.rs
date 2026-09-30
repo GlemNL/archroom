@@ -8,6 +8,7 @@ use archroom_jobs::Scheduler;
 use archroom_services::PreviewCache;
 use archroom_services::sidecar::SaveXmpJob;
 
+use crate::ExportRequestKind;
 use crate::selection::Selection;
 use crate::undo::UndoStack;
 
@@ -46,6 +47,7 @@ pub struct AppCx {
     pub gpu: Option<archroom_services::engine::gpu::GpuContext>,
     /// For registering engine textures with egui.
     pub render_state: Option<RenderStateHandle>,
+    export_request: Option<ExportRequestKind>,
 }
 
 impl AppCx {
@@ -60,6 +62,7 @@ impl AppCx {
             undo: UndoStack::default(),
             gpu: None,
             render_state: None,
+            export_request: None,
         }
     }
 
@@ -72,6 +75,16 @@ impl AppCx {
             &name,
         ));
         self.render_state = Some(RenderStateHandle(rs));
+    }
+
+    /// Asks the shell to open the Export dialog (or run the last export)
+    /// for the current selection; handled once per frame by `ExportUi`.
+    pub fn request_export(&mut self, kind: ExportRequestKind) {
+        self.export_request = Some(kind);
+    }
+
+    pub(crate) fn take_export_request(&mut self) -> Option<ExportRequestKind> {
+        self.export_request.take()
     }
 
     pub fn catalog_open(&self) -> bool {
