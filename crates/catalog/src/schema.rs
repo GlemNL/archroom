@@ -183,8 +183,18 @@ CREATE TABLE presets (
 );
 "#;
 
+/// Export presets (plan §9): a named, opaque JSON blob of export settings;
+/// its meaning lives in `archroom-services`.
+const V3: &str = r#"
+CREATE TABLE export_presets (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  settings TEXT NOT NULL
+);
+"#;
+
 pub fn migrations() -> Migrations<'static> {
-    Migrations::new(vec![M::up(V1), M::up(V2)])
+    Migrations::new(vec![M::up(V1), M::up(V2), M::up(V3)])
 }
 
 #[cfg(test)]

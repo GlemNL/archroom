@@ -312,7 +312,11 @@ pub fn show(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
         // Zooming in keeps the image point under the pointer in place.
         let anchor = resp.interact_pointer_pos().filter(|_| m.zoom == Zoom::Fit);
         let old_center = rect.center() + m.pan;
-        m.zoom = if m.zoom == Zoom::Fit { target } else { Zoom::Fit };
+        m.zoom = if m.zoom == Zoom::Fit {
+            target
+        } else {
+            Zoom::Fit
+        };
         m.pan = egui::Vec2::ZERO;
         if let (Some(pos), Some(z)) = (anchor, m.zoom.factor()) {
             let frac = (pos - old_center) / size;

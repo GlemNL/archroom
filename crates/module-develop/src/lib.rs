@@ -710,8 +710,8 @@ impl Module for DevelopModule {
             return;
         };
         if let Some(session) = &mut doc.session {
-            let orientation = Orientation::from_exif(info.exif_orientation)
-                .rotated(info.user_orientation);
+            let orientation =
+                Orientation::from_exif(info.exif_orientation).rotated(info.user_orientation);
             if session.orientation != orientation {
                 session.orientation = orientation;
                 doc.last_key = None;

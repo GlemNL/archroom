@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use archroom_catalog::Catalog;
+use archroom_color::icc::OutputSpace;
 use archroom_services::import::{ImportMode, ImportOptions, ImportProgressSink, run_import};
 use clap::{Parser, Subcommand};
 
@@ -60,6 +61,48 @@ enum Command {
         #[arg(long)]
         stats: bool,
     },
+    /// Export photos from a catalog (plan §9): the headless twin of the
+    /// Export dialog. Starts from a preset, then applies the flags.
+    Export {
+        /// The `.arcat` catalog to export from.
+        catalog: PathBuf,
+        /// Photo ids to export (default: every photo).
+        #[arg(long = "photo")]
+        photos: Vec<i64>,
+        /// A built-in or saved preset name (`--list-presets` shows them).
+        #[arg(long, default_value = "JPEG sRGB full size")]
+        preset: String,
+        /// Print the available presets and exit.
+        #[arg(long)]
+        list_presets: bool,
+        /// Export into this folder (default: the preset's destination).
+        #[arg(long)]
+        dest: Option<PathBuf>,
+        /// jpeg, tiff or png.
+        #[arg(long)]
+        format: Option<String>,
+        /// JPEG quality, 1-100.
+        #[arg(long)]
+        quality: Option<u8>,
+        /// 8 or 16 (TIFF/PNG).
+        #[arg(long)]
+        depth: Option<u8>,
+        /// srgb, p3, adobe or prophoto.
+        #[arg(long)]
+        space: Option<String>,
+        /// Resize so the longest edge is this many pixels.
+        #[arg(long)]
+        long_edge: Option<u32>,
+        /// Naming template, e.g. `{date:%Y%m%d}_{seq:4}_{filename}`.
+        #[arg(long)]
+        naming: Option<String>,
+        /// unique, overwrite or skip.
+        #[arg(long)]
+        conflict: Option<String>,
+        /// all, copyright or none.
+        #[arg(long)]
+        metadata: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -90,6 +133,128 @@ fn main() -> Result<()> {
                 println!("backed up {} -> {}", path.display(), dest.display());
             }
         },
+        Command::Export {
+            catalog,
+            photos,
+            preset,
+            list_presets,
+            dest,
+            format,
+            quality,
+            depth,
+            space,
+            long_edge,
+            naming,
+            conflict,
+            metadata,
+        } => {
+            use archroom_catalog::repo::{PhotoSort, list_all_photos};
+            use archroom_core::ids::PhotoId;
+            use archroom_services::export::job::{ExportRequest, ExportSink, run_export};
+            use archroom_services::export::{
+                Conflict, Destination, Format, MetadataMode, Resize, all_presets,
+            };
+            let cat = Catalog::create_or_open(&catalog)?;
+            let presets = all_presets(cat.connection())?;
+            if list_presets {
+                for p in &presets {
+                    println!("{}{}", p.name, if p.builtin { "  (built in)" } else { "" });
+                }
+                return Ok(());
+            }
+            let mut settings = presets
+                .into_iter()
+                .find(|p| p.name == preset)
+                .ok_or_else(|| anyhow::anyhow!("no export preset named \"{preset}\""))?
+                .settings;
+            if let Some(dir) = dest {
+                settings.destination = Destination::Folder(dir);
+            }
+            if let Some(f) = format {
+                settings.format = match f.to_ascii_lowercase().as_str() {
+                    "jpeg" | "jpg" => Format::Jpeg,
+                    "tiff" | "tif" => Format::Tiff,
+                    "png" => Format::Png,
+                    other => anyhow::bail!("unknown format {other}"),
+                };
+            }
+            if let Some(q) = quality {
+                settings.jpeg_quality = q;
+            }
+            if let Some(d) = depth {
+                anyhow::ensure!(d == 8 || d == 16, "depth must be 8 or 16");
+                settings.bit_depth = d;
+            }
+            if let Some(s) = space {
+                settings.space = match s.to_ascii_lowercase().as_str() {
+                    "srgb" => OutputSpace::Srgb,
+                    "p3" => OutputSpace::DisplayP3,
+                    "adobe" => OutputSpace::AdobeRgb,
+                    "prophoto" => OutputSpace::ProPhoto,
+                    other => anyhow::bail!("unknown color space {other}"),
+                };
+            }
+            if let Some(n) = long_edge {
+                settings.resize = Resize::LongEdge(n);
+            }
+            if let Some(n) = naming {
+                settings.naming = n;
+            }
+            if let Some(c) = conflict {
+                settings.conflict = match c.to_ascii_lowercase().as_str() {
+                    "unique" => Conflict::Unique,
+                    "overwrite" => Conflict::Overwrite,
+                    "skip" => Conflict::Skip,
+                    other => anyhow::bail!("unknown conflict policy {other}"),
+                };
+            }
+            if let Some(m) = metadata {
+                settings.metadata = match m.to_ascii_lowercase().as_str() {
+                    "all" => MetadataMode::All,
+                    "copyright" => MetadataMode::CopyrightOnly,
+                    "none" => MetadataMode::None,
+                    other => anyhow::bail!("unknown metadata mode {other}"),
+                };
+            }
+            let photos: Vec<PhotoId> = if photos.is_empty() {
+                list_all_photos(cat.connection(), PhotoSort::ImportOrder)?
+                    .into_iter()
+                    .map(|p| p.photo_id)
+                    .collect()
+            } else {
+                photos.into_iter().map(PhotoId::new).collect()
+            };
+            drop(cat);
+            let gpu = archroom_engine::gpu::GpuContext::headless()
+                .ok_or_else(|| anyhow::anyhow!("no usable Vulkan adapter"))?;
+            struct Stdout;
+            impl ExportSink for Stdout {
+                fn progress(&self, done: u32, total: u32) {
+                    println!("exported {done}/{total}");
+                }
+            }
+            let req = ExportRequest {
+                catalog_path: catalog,
+                photos,
+                settings,
+            };
+            let summary = run_export(&gpu, &req, &Stdout)?;
+            for p in &summary.written {
+                println!("wrote {}", p.display());
+            }
+            for (id, why) in &summary.failed {
+                eprintln!("photo {} failed: {why}", id.get());
+            }
+            println!(
+                "{} written, {} skipped, {} failed",
+                summary.written.len(),
+                summary.skipped,
+                summary.failed.len()
+            );
+            if !summary.failed.is_empty() {
+                std::process::exit(1);
+            }
+        }
         Command::Import {
             catalog,
             source,

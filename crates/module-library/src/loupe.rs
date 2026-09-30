@@ -108,50 +108,50 @@ pub fn show(
         area = area.scroll_offset(offset);
     }
     area.show(ui, |ui| match zoom {
-            Zoom::Fit => {
-                let available = ui.available_size();
-                // The rotated quad has swapped dimensions, so an odd
-                // quarter turn must lay the un-rotated rect out against
-                // swapped bounds for the result to still fit (plan §6.8's
-                // display-time transform).
-                let max_size = if odd_turns {
-                    egui::Vec2::new(available.y, available.x)
-                } else {
-                    available
-                };
-                ui.centered_and_justified(|ui| {
-                    let mut image = egui::Image::from_uri(uri.clone())
-                        .max_size(max_size)
-                        .maintain_aspect_ratio(true);
-                    if angle != 0.0 {
-                        image = image.rotate(angle, egui::Vec2::splat(0.5));
-                    }
-                    let r = ui.add(image.sense(egui::Sense::click()));
-                    if r.clicked() {
-                        clicked = r.interact_pointer_pos().map(|p| {
-                            let v = visual(r.rect);
-                            (p, (p - v.min) / v.size())
-                        });
-                    }
-                });
-            }
-            Zoom::OneToOne | Zoom::TwoToOne => {
-                let scale = if zoom == Zoom::TwoToOne { 2.0 } else { 1.0 };
+        Zoom::Fit => {
+            let available = ui.available_size();
+            // The rotated quad has swapped dimensions, so an odd
+            // quarter turn must lay the un-rotated rect out against
+            // swapped bounds for the result to still fit (plan §6.8's
+            // display-time transform).
+            let max_size = if odd_turns {
+                egui::Vec2::new(available.y, available.x)
+            } else {
+                available
+            };
+            ui.centered_and_justified(|ui| {
                 let mut image = egui::Image::from_uri(uri.clone())
-                    .fit_to_original_size(scale)
-                    .sense(egui::Sense::click());
+                    .max_size(max_size)
+                    .maintain_aspect_ratio(true);
                 if angle != 0.0 {
                     image = image.rotate(angle, egui::Vec2::splat(0.5));
                 }
-                let r = ui.add(image);
+                let r = ui.add(image.sense(egui::Sense::click()));
                 if r.clicked() {
                     clicked = r.interact_pointer_pos().map(|p| {
                         let v = visual(r.rect);
                         (p, (p - v.min) / v.size())
                     });
                 }
+            });
+        }
+        Zoom::OneToOne | Zoom::TwoToOne => {
+            let scale = if zoom == Zoom::TwoToOne { 2.0 } else { 1.0 };
+            let mut image = egui::Image::from_uri(uri.clone())
+                .fit_to_original_size(scale)
+                .sense(egui::Sense::click());
+            if angle != 0.0 {
+                image = image.rotate(angle, egui::Vec2::splat(0.5));
             }
-        });
+            let r = ui.add(image);
+            if r.clicked() {
+                clicked = r.interact_pointer_pos().map(|p| {
+                    let v = visual(r.rect);
+                    (p, (p - v.min) / v.size())
+                });
+            }
+        }
+    });
     // A left-click toggles between Fit and the configured zoom.
     if let Some((pos, frac)) = clicked
         && let Some(target) = Zoom::from_click(cx.settings.click_zoom)

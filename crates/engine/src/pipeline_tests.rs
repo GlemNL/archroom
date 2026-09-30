@@ -786,3 +786,45 @@ fn geometry_changes_rerun_the_pipeline_but_defaults_stay_pixel_identical() {
     let same = render(&mut pl, p, 64);
     assert_eq!(base.2, same.2);
 }
+
+#[test]
+fn sixteen_bit_output_matches_eight_bit_and_space_changes_encoding() {
+    use archroom_color::icc::OutputSpace;
+    let Some(g) = gpu() else { return };
+    let img = raw(
+        16,
+        16,
+        |x, y| [x as f32 / 15.0, y as f32 / 15.0, 0.3],
+        camera(None),
+    );
+    let mut pl = Pipeline::new(&g, &img).unwrap();
+    let eight = render(&mut pl, linear_profile(), 16);
+
+    let mut req = RenderRequest::new(linear_profile(), 16);
+    req.depth16 = true;
+    pl.render(&req).unwrap();
+    let (w, h, d16) = pl.read_output_rgba16().unwrap();
+    assert_eq!((w, h), (16, 16));
+    for y in 0..h {
+        for x in 0..w {
+            let i = ((y * w + x) * 4) as usize;
+            for c in 0..3 {
+                let got = d16[i + c] as f32 / 65535.0 * 255.0;
+                let want = eight.2[i + c] as f32;
+                // 8-bit output is dithered by up to half a step.
+                assert!((got - want).abs() <= 1.6, "({x},{y},{c}): {got} vs {want}");
+            }
+            assert_eq!(d16[i + 3], 65535);
+        }
+    }
+
+    // A saturated pixel encodes differently in ProPhoto (gamma 1.8) than sRGB.
+    let mut p3 = RenderRequest::new(linear_profile(), 16);
+    p3.depth16 = true;
+    p3.space = OutputSpace::ProPhoto;
+    pl.render(&p3).unwrap();
+    let (_, _, pp) = pl.read_output_rgba16().unwrap();
+    assert_ne!(pp[..3], d16[..3].to_vec()[..], "space had no effect");
+    let mid = ((8 * 16 + 8) * 4) as usize;
+    assert_ne!(pp[mid + 1], d16[mid + 1]);
+}

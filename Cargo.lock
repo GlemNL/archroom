@@ -334,6 +334,7 @@ dependencies = [
  "archroom-core",
  "lcms2",
  "proptest",
+ "serde",
  "thiserror 2.0.21",
 ]
 
@@ -456,11 +457,14 @@ dependencies = [
  "archroom-preview",
  "crossbeam-channel",
  "image",
+ "open",
+ "rexiv2",
  "rusqlite",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror 2.0.21",
+ "tiff",
  "tracing",
  "trash",
  "walkdir",

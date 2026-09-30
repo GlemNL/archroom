@@ -61,6 +61,21 @@ pub const REC2020: Primaries = Primaries {
     white: D65,
 };
 
+/// Adobe RGB (1998) primaries, D65 white.
+pub const ADOBE_RGB: Primaries = Primaries {
+    r: Xy::new(0.640, 0.330),
+    g: Xy::new(0.210, 0.710),
+    b: Xy::new(0.150, 0.060),
+    white: D65,
+};
+/// ProPhoto RGB (ROMM) primaries, D50 white.
+pub const PROPHOTO: Primaries = Primaries {
+    r: Xy::new(0.7347, 0.2653),
+    g: Xy::new(0.1596, 0.8404),
+    b: Xy::new(0.0366, 0.0001),
+    white: D50,
+};
+
 impl Primaries {
     pub fn rgb_to_xyz(&self) -> Mat3d {
         let (r, g, b) = (self.r.to_xyz(), self.g.to_xyz(), self.b.to_xyz());
@@ -111,7 +126,7 @@ mod tests {
 
     #[test]
     fn white_maps_to_the_white_point_for_every_space() {
-        for p in [SRGB, DISPLAY_P3, REC2020] {
+        for p in [SRGB, DISPLAY_P3, REC2020, ADOBE_RGB, PROPHOTO] {
             let xyz = p.rgb_to_xyz().mul_vec([1.0; 3]);
             let w = p.white.to_xyz();
             for i in 0..3 {

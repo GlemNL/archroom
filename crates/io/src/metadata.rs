@@ -17,7 +17,7 @@ static REXIV2_INIT: Once = Once::new();
 /// — only needs to run once. `Once` makes the first caller's thread pay for
 /// it and serializes against a second caller racing in before it's done;
 /// every caller after that is a no-op check.
-fn ensure_rexiv2_initialized() {
+pub(crate) fn ensure_rexiv2_initialized() {
     REXIV2_INIT.call_once(|| {
         if let Err(e) = rexiv2::initialize() {
             tracing::warn!(error = %e, "rexiv2::initialize failed");

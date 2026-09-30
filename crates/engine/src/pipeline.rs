@@ -23,7 +23,7 @@ use std::time::{Duration, Instant};
 use archroom_color::Mat3d;
 use archroom_color::cat::Cat;
 use archroom_color::cie::{REC2020, SRGB};
-use archroom_color::icc::{build_display_lut, srgb_profile};
+use archroom_color::icc::{OutputSpace, build_display_lut};
 use archroom_color::oklab::rgb_to_lms;
 use archroom_color::temp::temp_tint_to_xy;
 use archroom_io::DecodedImage;
@@ -44,6 +44,7 @@ use crate::tone::tone_uniform;
 
 const F16: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 const OUT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+const OUT16: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Uint;
 const LUT_N: u32 = 33;
 const BASE_MAX_EDGE: f32 = 1024.0;
 /// Guided-filter smoothness in EV² (larger = smoother base layer).
@@ -62,6 +63,11 @@ pub struct RenderRequest {
     /// Render the whole (straightened) canvas instead of the crop, for the
     /// crop tool (plan §6.8).
     pub ignore_crop: bool,
+    /// Delivery color space of the output (sRGB for the interactive views).
+    pub space: OutputSpace,
+    /// Export path: write 16-bit output (read with `read_output_rgba16`)
+    /// instead of the dithered 8-bit texture; no overlay or histogram.
+    pub depth16: bool,
 }
 
 impl RenderRequest {
@@ -73,6 +79,8 @@ impl RenderRequest {
             clip_overlay: false,
             want_histogram: false,
             ignore_crop: false,
+            space: OutputSpace::Srgb,
+            depth16: false,
         }
     }
 }
@@ -121,6 +129,7 @@ struct Kernels {
     tone: Kernel,
     display: Kernel,
     output: Kernel,
+    output16: Kernel,
     histogram: Kernel,
     noise: Kernel,
     clarity: Kernel,
@@ -193,6 +202,18 @@ impl Kernels {
                     Slot::Tex3d,
                     Slot::Sampler,
                     Slot::StorageOut(OUT),
+                ],
+            ),
+            output16: Kernel::new(
+                device,
+                "output16",
+                include_str!("shaders/output16.wgsl"),
+                &[
+                    Slot::Uniform,
+                    Slot::Tex2d { filterable: false },
+                    Slot::Tex3d,
+                    Slot::Sampler,
+                    Slot::StorageOut(OUT16),
                 ],
             ),
             histogram: Kernel::new(
@@ -483,12 +504,48 @@ fn guided_base(
     );
 }
 
+/// The 3D LUT taking display-referred Rec.2020 to `space`'s encoded values.
+fn display_lut(ctx: &GpuContext, space: OutputSpace) -> Result<wgpu::Texture> {
+    let lut_rgb = build_display_lut(&REC2020, &space.profile()?, LUT_N as usize)?;
+    let lut_rgba: Vec<half::f16> = lut_rgb
+        .chunks_exact(3)
+        .flat_map(|c| {
+            [
+                half::f16::from_f32(c[0]),
+                half::f16::from_f32(c[1]),
+                half::f16::from_f32(c[2]),
+                half::f16::ONE,
+            ]
+        })
+        .collect();
+    Ok(ctx.device.create_texture_with_data(
+        &ctx.queue,
+        &wgpu::TextureDescriptor {
+            label: Some("display-lut"),
+            size: wgpu::Extent3d {
+                width: LUT_N,
+                height: LUT_N,
+                depth_or_array_layers: LUT_N,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D3,
+            format: F16,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        },
+        wgpu::util::TextureDataOrder::LayerMajor,
+        bytemuck::cast_slice(&lut_rgba),
+    ))
+}
+
 /// The whole develop pipeline for one opened photo.
 pub struct Pipeline {
     ctx: GpuContext,
     k: Kernels,
     source: Source,
     lut: wgpu::Texture,
+    lut_space: OutputSpace,
     sampler: wgpu::Sampler,
     geo: Option<Cached>,
     scene: Option<Cached>,
@@ -496,6 +553,7 @@ pub struct Pipeline {
     tone: Option<Cached>,
     display: Option<Cached>,
     out: Option<Cached>,
+    out16: Option<Cached>,
     /// Guided-filter base layer of `scene`, keyed by the scene key.
     base: Option<Cached>,
     nr: Option<Cached>,
@@ -582,37 +640,7 @@ impl Pipeline {
             bytemuck::cast_slice(&data),
         );
 
-        let lut_rgb = build_display_lut(&REC2020, &srgb_profile(), LUT_N as usize)?;
-        let lut_rgba: Vec<half::f16> = lut_rgb
-            .chunks_exact(3)
-            .flat_map(|c| {
-                [
-                    half::f16::from_f32(c[0]),
-                    half::f16::from_f32(c[1]),
-                    half::f16::from_f32(c[2]),
-                    half::f16::ONE,
-                ]
-            })
-            .collect();
-        let lut = device.create_texture_with_data(
-            &ctx.queue,
-            &wgpu::TextureDescriptor {
-                label: Some("display-lut"),
-                size: wgpu::Extent3d {
-                    width: LUT_N,
-                    height: LUT_N,
-                    depth_or_array_layers: LUT_N,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D3,
-                format: F16,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING,
-                view_formats: &[],
-            },
-            wgpu::util::TextureDataOrder::LayerMajor,
-            bytemuck::cast_slice(&lut_rgba),
-        );
+        let lut = display_lut(ctx, OutputSpace::Srgb)?;
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
@@ -646,8 +674,10 @@ impl Pipeline {
                 kind,
             },
             lut,
+            lut_space: OutputSpace::Srgb,
             sampler,
             geo: None,
+            out16: None,
             scene: None,
             hs: None,
             tone: None,
@@ -714,6 +744,12 @@ impl Pipeline {
     /// Renders `req`, running only the stages whose inputs changed.
     pub fn render(&mut self, req: &RenderRequest) -> Result<RenderStats> {
         let started = Instant::now();
+        if self.lut_space != req.space {
+            self.lut = display_lut(&self.ctx, req.space)?;
+            self.lut_space = req.space;
+            self.out = None;
+            self.out16 = None;
+        }
         let scene_m = self.scene_matrix(&req.params);
         let rendered = matches!(self.source.kind, SourceKind::Rendered);
         let Self {
@@ -728,6 +764,7 @@ impl Pipeline {
             tone,
             display,
             out,
+            out16,
             base,
             nr,
             base_clarity,
@@ -1321,9 +1358,44 @@ impl Pipeline {
 
         // Stage 5: output transform.
         let mut ko = Key::chain(k_fx);
-        ko.u(req.clip_overlay as u64).u(LUT_N as u64);
+        ko.u(req.clip_overlay as u64)
+            .u(LUT_N as u64)
+            .u(req.space as u64)
+            .u(req.depth16 as u64);
         let k_out = ko.finish();
-        if ensure(device, out, k_out, dims, OUT, wgpu::TextureUsages::COPY_SRC) {
+        let lut_view = lut.create_view(&wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D3),
+            ..Default::default()
+        });
+        if req.depth16 {
+            if ensure(
+                device,
+                out16,
+                k_out,
+                dims,
+                OUT16,
+                wgpu::TextureUsages::COPY_SRC,
+            ) {
+                let u = uniform(device, &[[w as f32, h as f32, 0.0, LUT_N as f32]]);
+                let Some(o) = out16.as_ref() else {
+                    unreachable!()
+                };
+                k.output16.dispatch(
+                    device,
+                    &mut enc,
+                    &[
+                        u.as_entire_binding(),
+                        wgpu::BindingResource::TextureView(&view(&final_tex.tex)),
+                        wgpu::BindingResource::TextureView(&lut_view),
+                        wgpu::BindingResource::Sampler(sampler),
+                        wgpu::BindingResource::TextureView(&view(&o.tex)),
+                    ],
+                    w,
+                    h,
+                );
+                ran.output = true;
+            }
+        } else if ensure(device, out, k_out, dims, OUT, wgpu::TextureUsages::COPY_SRC) {
             let u = uniform(
                 device,
                 &[[
@@ -1336,10 +1408,6 @@ impl Pipeline {
             let Some(o) = out.as_ref() else {
                 unreachable!()
             };
-            let lut_view = lut.create_view(&wgpu::TextureViewDescriptor {
-                dimension: Some(wgpu::TextureViewDimension::D3),
-                ..Default::default()
-            });
             k.output.dispatch(
                 device,
                 &mut enc,
@@ -1357,7 +1425,7 @@ impl Pipeline {
         }
 
         // Histogram of the 8-bit output.
-        let want_hist = req.want_histogram && self.hist_key != Some(k_out);
+        let want_hist = req.want_histogram && !req.depth16 && self.hist_key != Some(k_out);
         if want_hist && let Some(o) = out.as_ref() {
             enc.clear_buffer(&self.hist_buf, 0, None);
             let u = uniform(device, &[[w as f32, h as f32, 0.0, 0.0]]);
@@ -1399,11 +1467,26 @@ impl Pipeline {
 
     /// Reads the output back as tightly packed RGBA8 (for the CLI and tests).
     pub fn read_output_rgba8(&self) -> Result<(u32, u32, Vec<u8>)> {
-        let Some(o) = self.out.as_ref() else {
+        self.read_texture(self.out.as_ref(), 4)
+    }
+
+    /// Reads a `depth16` render back as tightly packed RGBA, 16 bits per
+    /// channel (the alpha channel is always full).
+    pub fn read_output_rgba16(&self) -> Result<(u32, u32, Vec<u16>)> {
+        let (w, h, bytes) = self.read_texture(self.out16.as_ref(), 8)?;
+        let px = bytes
+            .chunks_exact(2)
+            .map(|b| u16::from_le_bytes([b[0], b[1]]))
+            .collect();
+        Ok((w, h, px))
+    }
+
+    fn read_texture(&self, o: Option<&Cached>, bpp: u32) -> Result<(u32, u32, Vec<u8>)> {
+        let Some(o) = o else {
             return Err(Error::Readback("nothing rendered yet".into()));
         };
         let device = &self.ctx.device;
-        let row = (o.w * 4).next_multiple_of(256);
+        let row = (o.w * bpp).next_multiple_of(256);
         let buf = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("readback"),
             size: (row * o.h) as u64,
@@ -1436,10 +1519,11 @@ impl Pipeline {
         );
         self.ctx.queue.submit(std::iter::once(enc.finish()));
         let padded = read_buffer(device, &buf, (row * o.h) as u64)?;
-        let mut out = Vec::with_capacity((o.w * o.h * 4) as usize);
+        let line = (o.w * bpp) as usize;
+        let mut out = Vec::with_capacity(line * o.h as usize);
         for y in 0..o.h as usize {
             let s = y * row as usize;
-            out.extend_from_slice(&padded[s..s + (o.w * 4) as usize]);
+            out.extend_from_slice(&padded[s..s + line]);
         }
         Ok((o.w, o.h, out))
     }

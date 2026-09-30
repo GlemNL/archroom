@@ -874,8 +874,8 @@ Prove the stack end to end and lay down the skeleton.
 
 ### M5: Export, hardening, v0.1
 
-- [ ] Export dialog and presets (§9): `Encoder` registry (JPEG, TIFF, PNG), ICC embedding, metadata options, naming templates, resize, conflict policy
-- [ ] Full-resolution tiled render path; background batch export with progress and cancel
+- [ ] Export dialog and presets (§9): **backend done** (`services::export`: `ExportSettings`, built-in and catalog presets in the `export_presets` table, naming templates, resize, conflict policy, JPEG/TIFF 8/16-bit none/LZW/ZIP/PNG encoders with ICC embedded for sRGB/Display P3/Adobe RGB/ProPhoto, exiv2 metadata all/copyright/none with include-on-export keyword filtering; `archroom-cli export`). Encoders are plain functions in `export::encode` rather than a registry yet (three formats). Never enlarges. **Dialog not done.**
+- [ ] Full-resolution tiled render path; background batch export with progress and cancel — `ExportJob` (progress/cancel, atomic temp+rename, `CatalogEvent::Export*`) done; full-res renders whole-frame (16-bit output via `RenderRequest::{space, depth16}` and `output16.wgsl`), no tiling yet: `Pipeline::new` fails with `TooLarge` past the GPU's max texture size. Measured 24.5 MP NEF → full-size JPEG in ~2.4 s wall on the RX 7900 including decode, over the §12 1.5 s target (perf pass to break it down)
 - [ ] L3 1:1 preview cache and Develop prefetch (MVP+)
 - [ ] Robustness: integrity check on open, scheduled backups, crash-safe writes, clear error messages
 - [ ] Preferences dialog: catalog path, preview size and quality, cache budgets, XMP behavior, GPU selection, center background

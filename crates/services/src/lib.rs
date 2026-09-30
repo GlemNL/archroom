@@ -13,6 +13,7 @@
 
 pub mod develop;
 mod error;
+pub mod export;
 pub mod import;
 pub mod presets;
 pub mod preview;

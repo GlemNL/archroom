@@ -8,6 +8,7 @@ pub mod command;
 pub mod criteria;
 pub mod develop;
 mod error;
+pub mod export_presets;
 pub mod presets;
 pub mod repo;
 mod schema;

@@ -105,6 +105,19 @@ pub enum CatalogEvent {
         import_id: ImportId,
         imported: u32,
     },
+    /// One photo of an export batch finished (or failed/skipped).
+    ExportProgress {
+        export_id: u64,
+        done: u32,
+        total: u32,
+    },
+    ExportFinished {
+        export_id: u64,
+        exported: u32,
+        skipped: u32,
+        failed: u32,
+        cancelled: bool,
+    },
 }
 
 #[cfg(test)]
