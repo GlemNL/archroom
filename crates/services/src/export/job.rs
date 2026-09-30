@@ -135,7 +135,9 @@ fn export_one(
     };
 
     let params = crate::develop::load_params(conn, photo)?;
+    let t_start = std::time::Instant::now();
     let (w, h, pixels) = render(gpu, &info, &params, settings)?;
+    let t_rendered = t_start.elapsed();
 
     // Write beside the target and rename, so a crash or cancel never leaves a
     // truncated file under the final name.
@@ -145,10 +147,19 @@ fn export_one(
             .space
             .icc_bytes()
             .map_err(|e| Error::Other(e.to_string()))?;
+        let t = std::time::Instant::now();
         encode_to_file(&part, w, h, &pixels, settings, &icc)?;
+        let t_encoded = t.elapsed();
         if let Some(meta) = export_metadata(conn, photo, settings)? {
             write_export_metadata(&part, &meta)?;
         }
+        let t_meta = t.elapsed() - t_encoded;
+        tracing::debug!(
+            render_and_readback_ms = t_rendered.as_millis() as u64,
+            encode_ms = t_encoded.as_millis() as u64,
+            metadata_ms = t_meta.as_millis() as u64,
+            "export stages"
+        );
         std::fs::rename(&part, &target).map_err(|e| Error::io(&target, e))
     })();
     if result.is_err() {
@@ -164,10 +175,13 @@ fn render(
     params: &EditParams,
     settings: &ExportSettings,
 ) -> Result<(u32, u32, Pixels)> {
+    let t0 = std::time::Instant::now();
     let decoder = archroom_io::decoder_for(&info.path)
         .ok_or_else(|| Error::Other(format!("no decoder for {}", info.path.display())))?;
     let decoded = decoder.decode(&info.path, &DecodeOptions::default())?;
+    let t_decode = t0.elapsed();
     let mut pipeline = Pipeline::new(gpu, &decoded).map_err(|e| Error::Other(e.to_string()))?;
+    let t_upload = t0.elapsed();
 
     let orientation = Orientation::from_exif(info.exif_orientation).rotated(info.user_orientation);
     let (sw, sh) = pipeline.source_size();
@@ -181,6 +195,13 @@ fn render(
     pipeline
         .render(&req)
         .map_err(|e| Error::Other(e.to_string()))?;
+    let t_render = t0.elapsed();
+    tracing::debug!(
+        decode_ms = t_decode.as_millis() as u64,
+        upload_ms = (t_upload - t_decode).as_millis() as u64,
+        render_ms = (t_render - t_upload).as_millis() as u64,
+        "export render"
+    );
     if req.depth16 {
         let (w, h, px) = pipeline
             .read_output_rgba16()

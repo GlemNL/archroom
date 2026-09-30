@@ -1,0 +1,50 @@
+# Maintainer: Clément L <a.kenbari@gmail.com>
+pkgname=archroom
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Photo catalog and raw developer with a Lightroom-style workflow (Library and Develop)'
+arch=('x86_64')
+url='https://github.com/archroom/archroom'
+license=('GPL-3.0-or-later')
+depends=('gcc-libs' 'glibc' 'lcms2' 'libgexiv2' 'libraw' 'vulkan-icd-loader'
+         'libxkbcommon' 'wayland')
+makedepends=('cargo' 'clang' 'pkgconf')
+optdepends=('vulkan-radeon: Vulkan driver for AMD GPUs'
+            'vulkan-intel: Vulkan driver for Intel GPUs'
+            'nvidia-utils: Vulkan driver for NVIDIA GPUs'
+            'xdg-desktop-portal: file pickers for Import and Export')
+options=('!lto')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP') # replace with the tag's checksum when v0.1.0 is published
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release -p archroom-app -p archroom-cli
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  # The GPU tests skip themselves when no Vulkan adapter is available.
+  cargo test --frozen --workspace
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm755 target/release/archroom -t "$pkgdir/usr/bin/"
+  install -Dm755 target/release/archroom-cli -t "$pkgdir/usr/bin/"
+  install -Dm644 packaging/archroom.desktop -t "$pkgdir/usr/share/applications/"
+  install -Dm644 assets/archroom.svg \
+    "$pkgdir/usr/share/icons/hicolor/scalable/apps/archroom.svg"
+  install -Dm644 README.md -t "$pkgdir/usr/share/doc/$pkgname/"
+  install -Dm644 LICENSE -t "$pkgdir/usr/share/licenses/$pkgname/"
+}

@@ -26,7 +26,8 @@ walkdir = "2"
 open = "5"
 trash = "5"
 tiff = "0.10"
-image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+jpeg-encoder = { version = "0.6", features = ["simd"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 
 [dev-dependencies]

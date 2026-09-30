@@ -7,7 +7,6 @@ use std::path::Path;
 
 use image::ExtendedColorType;
 use image::ImageEncoder;
-use image::codecs::jpeg::{JpegEncoder, PixelDensity};
 use image::codecs::png::PngEncoder;
 use tiff::encoder::colortype::{RGB8, RGB16};
 use tiff::encoder::compression::DeflateLevel;
@@ -59,13 +58,19 @@ pub fn encode_to_file(
             let Pixels::Rgba8(rgba) = pixels else {
                 return Err(other("JPEG export needs 8-bit pixels"));
             };
-            let mut enc =
-                JpegEncoder::new_with_quality(&mut out, settings.jpeg_quality.clamp(1, 100));
-            enc.set_icc_profile(icc.to_vec()).map_err(other)?;
+            // `jpeg-encoder` with SIMD is about twice as fast as `image`'s
+            // JPEG writer; it reads RGBA directly and ignores the alpha.
+            let mut enc = jpeg_encoder::Encoder::new(&mut out, settings.jpeg_quality.clamp(1, 100));
+            enc.add_icc_profile(icc).map_err(other)?;
             if settings.ppi > 0 {
-                enc.set_pixel_density(PixelDensity::dpi(settings.ppi.min(u16::MAX as u32) as u16));
+                let d = settings.ppi.min(u32::from(u16::MAX)) as u16;
+                enc.set_density(jpeg_encoder::Density::Inch { x: d, y: d });
             }
-            enc.write_image(&rgb8(rgba), w, h, ExtendedColorType::Rgb8)
+            let (w16, h16) = (
+                u16::try_from(w).map_err(|_| other("image too wide for JPEG"))?,
+                u16::try_from(h).map_err(|_| other("image too tall for JPEG"))?,
+            );
+            enc.encode(rgba, w16, h16, jpeg_encoder::ColorType::Rgba)
                 .map_err(other)?;
         }
         Format::Png => {

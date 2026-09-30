@@ -9,6 +9,7 @@ license.workspace = true
 workspace = true
 
 [dependencies]
+rayon = { workspace = true }
 archroom-core = { workspace = true }
 archroom-color = { workspace = true }
 libraw-sys = { workspace = true }

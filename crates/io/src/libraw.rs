@@ -6,6 +6,7 @@
 //! (reference-WB demosaic, linear output, plan §6.3) rather than sharing
 //! code with it, since the two are expected to diverge once Develop lands.
 
+use rayon::prelude::*;
 use std::ffi::CString;
 use std::path::Path;
 
@@ -147,14 +148,17 @@ impl Decoder for RawDecoder {
             let samples =
                 std::slice::from_raw_parts(img.data.as_ptr().cast::<u16>(), n_pixels * colors);
             let mut data = vec![0f32; n_pixels * 4];
-            for px in 0..n_pixels {
-                let src = px * colors;
-                let dst = px * 4;
-                data[dst] = samples[src] as f32 / 65535.0;
-                data[dst + 1] = samples[src + 1] as f32 / 65535.0;
-                data[dst + 2] = samples[src + 2] as f32 / 65535.0;
-                data[dst + 3] = 1.0;
-            }
+            data.par_chunks_mut(4 * 4096)
+                .enumerate()
+                .for_each(|(chunk, out)| {
+                    for (i, px) in out.chunks_exact_mut(4).enumerate() {
+                        let src = (chunk * 4096 + i) * colors;
+                        px[0] = samples[src] as f32 / 65535.0;
+                        px[1] = samples[src + 1] as f32 / 65535.0;
+                        px[2] = samples[src + 2] as f32 / 65535.0;
+                        px[3] = 1.0;
+                    }
+                });
 
             Ok(DecodedImage::SceneLinear {
                 rgb: ImageF32 {

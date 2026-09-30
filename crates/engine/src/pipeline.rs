@@ -37,6 +37,8 @@ use crate::ops::{
     BwMix, Clarity, Exposure, Hsl, Noise, Presence, Profile, ProfileName, Sharpen, Tone, ToneCurve,
     Treatment, Vignette, WbMode, WhiteBalance, build_luts,
 };
+use rayon::prelude::*;
+
 use crate::orientation::Orientation;
 use crate::params::EditParams;
 use crate::rawprep::SceneColor;
@@ -605,21 +607,28 @@ impl Pipeline {
             .collect();
         let ch = rgb.channels.max(3) as usize;
         let px = (rgb.width as usize) * (rgb.height as usize);
-        let mut data = Vec::with_capacity(px * 4);
-        for p in rgb.data.chunks_exact(ch) {
-            for &v in &p[..3] {
-                let v = if linearize {
-                    let x = v.clamp(0.0, 1.0) * 4096.0;
-                    let i = (x as usize).min(4095);
-                    let f = x - i as f32;
-                    table[i] * (1.0 - f) + table[i + 1] * f
-                } else {
-                    v
-                };
-                data.push(half::f16::from_f32(v));
-            }
-            data.push(half::f16::ONE);
-        }
+        let mut data = vec![half::f16::ZERO; px * 4];
+        // Converting 24 MP one sample at a time takes a couple of hundred
+        // ms; spread it over the cores.
+        data.par_chunks_mut(4 * 4096)
+            .zip(rgb.data.par_chunks(ch * 4096))
+            .for_each(|(out, src)| {
+                for (o, p) in out.chunks_exact_mut(4).zip(src.chunks_exact(ch)) {
+                    for c in 0..3 {
+                        let v = p[c];
+                        let v = if linearize {
+                            let x = v.clamp(0.0, 1.0) * 4096.0;
+                            let i = (x as usize).min(4095);
+                            let f = x - i as f32;
+                            table[i] * (1.0 - f) + table[i + 1] * f
+                        } else {
+                            v
+                        };
+                        o[c] = half::f16::from_f32(v);
+                    }
+                    o[3] = half::f16::ONE;
+                }
+            });
         let tex = device.create_texture_with_data(
             &ctx.queue,
             &wgpu::TextureDescriptor {

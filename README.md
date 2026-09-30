@@ -14,7 +14,7 @@ Catalog thousands of photos, cull them from the keyboard, and develop raws on th
 </div>
 
 > [!NOTE]
-> Archroom is **pre-release (v0.1 in progress)**. Import, organizing and most of Develop work. **Export is not built yet**, so it isn't ready to be your only editor. See [Status](#status).
+> Archroom is **pre-release (v0.1 in progress)**. Import, organizing, Develop and Export work. Expect rough edges: keep your originals backed up (Archroom never modifies them) and see [Status](#status).
 
 <!-- TODO: add screenshots to assets/ (Library grid, Develop module) -->
 
@@ -40,6 +40,15 @@ Linux has excellent raw tools, but few that combine a fast catalog with a famili
 - Filter bar with full-text search
 - XMP sidecar read/write that preserves fields written by other apps
 
+### Export
+- JPEG, TIFF (8/16-bit; none, LZW or ZIP) and PNG (8/16-bit), with the ICC profile embedded
+- sRGB, Display P3, Adobe RGB and ProPhoto output, full-resolution 16-bit render on the GPU
+- Resize by long edge, short edge, box, megapixels or percent (never enlarges)
+- File-name templates (`{filename}`, `{seq:4}`, `{date:%Y%m%d}`, `{title}`, `{custom}`), rename/overwrite/skip on conflict
+- Metadata: everything, copyright only, or none; optional location removal; keyword hierarchy
+- Presets, and a background batch with progress and cancel while you keep working
+- `archroom-cli export` does the same without the UI
+
 ### Develop
 - White balance, exposure, contrast, highlights, shadows, whites and blacks
 - Tone curve (parametric and point), HSL and B&W mixer
@@ -61,6 +70,9 @@ Linux has excellent raw tools, but few that combine a fast catalog with a famili
 | `Ctrl+K` | Focus keyword entry |
 | `Ctrl+[` / `Ctrl+]` | Rotate left / right |
 | `Ctrl+S` | Write XMP sidecars |
+| `Ctrl+Shift+E` | Export the selection |
+| `Ctrl+Alt+Shift+E` | Export again with the last settings |
+| `Ctrl+,` | Preferences |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / Redo |
 | `Ctrl+A` / `Ctrl+D` | Select all / none |
 | `←` / `→` | Previous / next photo |
@@ -95,6 +107,14 @@ sudo pacman -S --needed rust libraw lcms2 exiv2 libgexiv2 clang \
 
 Other distributions need the equivalent development packages (for example `libraw-dev`, `liblcms2-dev`, `libgexiv2-dev` and `libclang-dev` on Debian/Ubuntu). Packaging for more distros is [planned](#roadmap).
 
+### Install (Arch Linux)
+
+`packaging/PKGBUILD` builds the package from a release tag:
+
+```sh
+cd packaging && makepkg -si
+```
+
 ### Run
 
 ```sh
@@ -127,7 +147,8 @@ cargo run -p archroom-cli -- render --help
 | Config | `~/.config/archroom/config.toml` |
 | Presets | `~/.local/share/archroom/presets/` |
 | Catalog | `~/Pictures/Archroom/Archroom.arcat` (SQLite) |
-| Previews | Next to the catalog, in `Archroom Previews/` |
+| Previews | Next to the catalog, in `Archroom Previews/` (trimmed to the cache budget at startup) |
+| Backups | Next to the catalog, in `Archroom Backups/` (daily, newest few kept) |
 | Caches | `~/.cache/archroom/` (safe to delete) |
 | Logs | `~/.local/state/archroom/logs/` |
 
@@ -162,13 +183,12 @@ Design decisions are recorded as ADRs in [`docs/adr/`](docs/adr), and the full p
 | M2 Organize | Nearly done (remove-from-catalog and missing-file handling pending) |
 | M3 Develop foundation | Done |
 | M4 Develop tools | Mostly done (image-quality tuning pass pending) |
-| M5 Export and v0.1 release | Not started |
+| M5 Export and v0.1 release | Export, backups, Preferences and packaging done; performance and the release checklist pending |
 
 ## Roadmap
 
-- Export (JPEG, TIFF, PNG) with presets and background batch export
-- Preferences, backups and robustness work
-- Packaging: AUR first, then Flatpak
+- Own GPU demosaic (a full-size export of a 24 MP raw is bound by LibRaw's ~1.1 s CPU decode), 1:1 preview cache
+- Flatpak (after the AUR package)
 - After v0.1: local adjustments (gradients, brushes, masks), spot removal, lens corrections, monitor ICC profiles
 
 ## Contributing

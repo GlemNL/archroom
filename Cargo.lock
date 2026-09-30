@@ -366,6 +366,7 @@ dependencies = [
  "image",
  "pollster",
  "proptest",
+ "rayon",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -382,6 +383,7 @@ dependencies = [
  "archroom-core",
  "image",
  "libraw-sys",
+ "rayon",
  "rexiv2",
  "tempfile",
  "thiserror 2.0.21",
@@ -457,6 +459,7 @@ dependencies = [
  "archroom-preview",
  "crossbeam-channel",
  "image",
+ "jpeg-encoder",
  "open",
  "rexiv2",
  "rusqlite",
@@ -2300,6 +2303,12 @@ dependencies = [
  "getrandom 0.4.3",
  "libc",
 ]
+
+[[package]]
+name = "jpeg-encoder"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b454d911ac55068f53495488d8ccd0646eaa540c033a28ee15b07838afafb01f"
 
 [[package]]
 name = "js-sys"
