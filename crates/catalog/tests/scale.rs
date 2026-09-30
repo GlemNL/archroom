@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Query performance on a generated 50,000-photo catalog (plan §13: "query
 //! tests on generated 50k-row catalogs to catch performance regressions").
 //! The bounds are loose so a slow CI machine passes, tight enough that an
