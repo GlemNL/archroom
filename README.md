@@ -121,7 +121,21 @@ sudo pacman -S --needed rust libraw lcms2 exiv2 libgexiv2 clang \
 
 Other distributions need the equivalent development packages (for example `libraw-dev`, `liblcms2-dev`, `libgexiv2-dev` and `libclang-dev` on Debian/Ubuntu). Packaging for more distros is [planned](#roadmap).
 
-### Install (Arch Linux)
+### Install from a release
+
+Each [release](https://github.com/GlemNL/archroom/releases) ships:
+
+| Format | For |
+|---|---|
+| `.AppImage` | Any x86_64 distribution (bundles LibRaw, lcms2 and gexiv2) |
+| `.deb` (`ubuntu22.04`, `ubuntu24.04`) | Ubuntu and derivatives; pick the one matching your release |
+| `.rpm` | Fedora |
+| `.pkg.tar.zst` | Arch Linux (`sudo pacman -U`) |
+| `SHA256SUMS` | Checksums for all of the above |
+
+All of them need a working Vulkan driver on the host.
+
+### Build the Arch package from source
 
 `packaging/PKGBUILD` builds the package from a release tag:
 
