@@ -4,6 +4,8 @@
 
 **A Linux-native, non-destructive photo library and raw developer.**
 
+*A darkroom with the lights on, built on Arch.*
+
 Catalog thousands of photos, cull them from the keyboard, and develop raws on the GPU, without ever touching your originals.
 
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
@@ -20,7 +22,9 @@ Catalog thousands of photos, cull them from the keyboard, and develop raws on th
 
 ## Why Archroom
 
-Linux has excellent raw tools, but few that combine a fast catalog with a familiar develop workflow. Archroom aims at a workflow of Library and Develop modules, a filmstrip, panels and sliders, with a keyboard-first way of working.
+Linux has excellent raw tools, but few that pair a fast catalog with a develop workflow you already know. Archroom is a Library and Develop pair with a filmstrip, panels and sliders, driven from the keyboard.
+
+If you've ever spent an evening in a well-known room full of light, your fingers will find their way around here: the panel order, the slider names and the shortcuts will feel familiar. Everything else is new, open source, and yours.
 
 - **Non-destructive.** Originals are opened read-only. Edits are stored as parameters in the catalog, so every edit can be undone or changed later.
 - **GPU-first.** Development runs on a scene-referred, linear-light float pipeline in WGSL compute shaders (via `wgpu`/Vulkan). Sliders re-render in well under a millisecond on a modern GPU.
