@@ -18,7 +18,13 @@ Catalog thousands of photos, cull them from the keyboard, and develop raws on th
 > [!NOTE]
 > Archroom is **pre-release (v0.1 in progress)**. Import, organizing, Develop and Export work. Expect rough edges: keep your originals backed up (Archroom never modifies them) and see [Status](#status).
 
-<!-- TODO: add screenshots to assets/ (Library grid, Develop module) -->
+## Screenshots
+
+![The Library module: folder tree, filter bar, virtualized grid, metadata panel and filmstrip](images/library.png)
+*Library: browse, filter and cull a catalog from the grid.*
+
+![The Develop module: navigator, presets and history on the left, histogram and adjustment panels on the right](images/develop.png)
+*Develop: non-destructive raw editing with presets, history, histogram and the full set of panels.*
 
 ## Why Archroom
 
@@ -52,6 +58,10 @@ If you've ever spent an evening in a well-known room full of light, your fingers
 - Metadata: everything, copyright only, or none; optional location removal; keyword hierarchy
 - Presets, and a background batch with progress and cancel while you keep working
 - `archroom-cli export` does the same without the UI
+
+<p align="center">
+  <img src="images/export.png" alt="The Export dialog: format, color space, resize, destination, file name template and metadata options" width="360">
+</p>
 
 ### Develop
 - White balance, exposure, contrast, highlights, shadows, whites and blacks
