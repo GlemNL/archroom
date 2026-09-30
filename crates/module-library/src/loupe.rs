@@ -52,6 +52,9 @@ pub fn show(
     let ordered: Vec<PhotoId> = photos.iter().map(|p| p.photo_id).collect();
     handle_prev_next(ui, cx, &ordered);
 
+    ui.painter()
+        .rect_filled(ui.available_rect_before_wrap(), 0.0, cx.center_background());
+
     let Some(active) = cx.selection.active else {
         ui.centered_and_justified(|ui| ui.label("Select a photo to view."));
         return None;
@@ -71,7 +74,7 @@ pub fn show(
             &path,
             photo.photo_id,
             archroom_services::LEVEL_L2,
-            archroom_services::L2_BUDGET_PX,
+            archroom_services::l2_budget_px(),
         ) {
             Ok(p) => Some(p),
             Err(e) => {

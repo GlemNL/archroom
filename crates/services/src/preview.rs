@@ -90,3 +90,31 @@ mod tests {
         assert_eq!(std::fs::read(&second).unwrap(), first_bytes);
     }
 }
+
+/// Startup housekeeping for the preview cache: sweeps stray files and
+/// evicts the oldest previews past the budget (they regenerate on demand).
+#[derive(Debug)]
+pub struct TrimPreviewsJob {
+    pub catalog_path: std::path::PathBuf,
+    pub budget_bytes: u64,
+}
+
+impl archroom_jobs::Job for TrimPreviewsJob {
+    fn label(&self) -> String {
+        "Tidying the preview cache".to_string()
+    }
+
+    fn priority(&self) -> archroom_jobs::Priority {
+        archroom_jobs::Priority::Background
+    }
+
+    fn run(self: Box<Self>, _cx: &archroom_jobs::JobContext) {
+        match archroom_preview::PreviewCache::open_for_catalog(&self.catalog_path)
+            .and_then(|cache| cache.trim(self.budget_bytes))
+        {
+            Ok(0) => {}
+            Ok(freed) => tracing::info!(freed, "preview cache trimmed"),
+            Err(e) => tracing::warn!(error = %e, "preview cache trim failed"),
+        }
+    }
+}

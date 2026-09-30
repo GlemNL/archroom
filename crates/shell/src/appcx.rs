@@ -87,6 +87,17 @@ impl AppCx {
         self.export_request.take()
     }
 
+    /// The fill behind the photo in Loupe and Develop (Preferences).
+    pub fn center_background(&self) -> egui::Color32 {
+        use archroom_core::settings::CenterBackground as Bg;
+        egui::Color32::from_gray(match self.settings.center_background {
+            Bg::Black => 0x00,
+            Bg::DarkGray => 0x10,
+            Bg::MediumGray => 0x50,
+            Bg::White => 0xf0,
+        })
+    }
+
     pub fn catalog_open(&self) -> bool {
         self.catalog.is_some()
     }

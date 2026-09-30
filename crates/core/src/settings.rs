@@ -59,6 +59,10 @@ pub struct Settings {
     pub cache_budget_mb: u32,
     /// `wgpu` adapter name to prefer, or `None` for the default adapter.
     pub gpu_adapter: Option<String>,
+    /// Back the catalog up at most once a day at startup (plan §14).
+    pub backups_enabled: bool,
+    /// How many backups to keep.
+    pub backup_keep: u32,
 }
 
 impl Default for Settings {
@@ -72,6 +76,8 @@ impl Default for Settings {
             preview_jpeg_quality: 90,
             cache_budget_mb: 5 * 1024,
             gpu_adapter: None,
+            backups_enabled: true,
+            backup_keep: 5,
         }
     }
 }
@@ -107,7 +113,7 @@ impl Settings {
             std::fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
         }
         let text = toml::to_string_pretty(self).map_err(|e| Error::Settings(e.to_string()))?;
-        std::fs::write(path, text).map_err(|e| Error::io(path, e))
+        crate::fsutil::write_atomic(path, text.as_bytes())
     }
 }
 

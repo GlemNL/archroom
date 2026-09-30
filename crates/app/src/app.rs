@@ -1,9 +1,11 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use archroom_catalog::Catalog;
 use archroom_jobs::{JobEventKind, Scheduler};
-use archroom_shell::{AppCx, ExportRequestKind, ExportUi, ModuleRegistry};
+use archroom_services::backup::{BackupJob, BackupOutcome, list_backups, restore_backup};
+use archroom_services::preview::TrimPreviewsJob;
+use archroom_shell::{AppCx, ExportRequestKind, ExportUi, ModuleRegistry, PreferencesUi};
 use crossbeam_channel::Receiver;
 use tracing::{error, info};
 
@@ -23,6 +25,84 @@ fn default_catalog_path() -> PathBuf {
     base.join("Archroom").join("Archroom.arcat")
 }
 
+/// Why the catalog could not be used as-is.
+#[derive(Debug)]
+struct Problem {
+    path: PathBuf,
+    /// What went wrong, in words for the user.
+    message: String,
+    /// The catalog opened but failed its check; "Open anyway" is possible.
+    damaged: bool,
+    backups: Vec<PathBuf>,
+}
+
+/// Opens the catalog and its preview cache into `cx` and starts the daily
+/// backup and cache housekeeping. A catalog that will not open, or fails its
+/// quick check, is left closed and reported instead (plan §14).
+fn open_catalog(cx: &mut AppCx, path: &Path) -> Result<Receiver<BackupOutcome>, Problem> {
+    let problem = |message: String, damaged: bool| Problem {
+        path: path.to_path_buf(),
+        message,
+        damaged,
+        backups: list_backups(path),
+    };
+    let catalog = Catalog::create_or_open(path).map_err(|e| {
+        error!(path = %path.display(), error = %e, "failed to open catalog");
+        problem(format!("The catalog could not be opened: {e}"), false)
+    })?;
+    match catalog.quick_check() {
+        Ok(true) => {}
+        Ok(false) => {
+            error!(path = %path.display(), "catalog failed its integrity check");
+            return Err(problem(
+                "The catalog failed its integrity check; it may be damaged.".into(),
+                true,
+            ));
+        }
+        Err(e) => {
+            return Err(problem(
+                format!("The catalog could not be checked: {e}"),
+                true,
+            ));
+        }
+    }
+    Ok(finish_open(cx, catalog, path, true))
+}
+
+/// Adopts `catalog`. `take_backup` is false for a catalog the user opened
+/// despite a failed check: a damaged file must never rotate good backups out.
+fn finish_open(
+    cx: &mut AppCx,
+    catalog: Catalog,
+    path: &Path,
+    take_backup: bool,
+) -> Receiver<BackupOutcome> {
+    info!(path = %path.display(), "catalog ready");
+    match archroom_services::PreviewCache::open_for_catalog(path) {
+        Ok(previews) => cx.previews = Some(previews),
+        Err(e) => error!(error = %e, "failed to open preview cache"),
+    }
+    cx.settings.last_catalog = Some(path.to_path_buf());
+    if let Err(e) = cx.settings.save() {
+        error!(error = %e, "failed to save settings");
+    }
+    cx.catalog = Some(catalog);
+
+    let (tx, rx) = crossbeam_channel::unbounded();
+    if take_backup && cx.settings.backups_enabled {
+        cx.jobs.submit(BackupJob {
+            catalog_path: path.to_path_buf(),
+            keep: cx.settings.backup_keep as usize,
+            done: tx,
+        });
+    }
+    cx.jobs.submit(TrimPreviewsJob {
+        catalog_path: path.to_path_buf(),
+        budget_bytes: u64::from(cx.settings.cache_budget_mb) * 1024 * 1024,
+    });
+    rx
+}
+
 pub struct ArchroomApp {
     cx: AppCx,
     registry: ModuleRegistry,
@@ -32,6 +112,11 @@ pub struct ArchroomApp {
     show_spike_window: bool,
     spike_view: SpikeView,
     export_ui: ExportUi,
+    prefs_ui: PreferencesUi,
+    /// A catalog that failed its startup check or would not open.
+    problem: Option<Problem>,
+    backup_rx: Receiver<BackupOutcome>,
+    backup_note: Option<String>,
 }
 
 impl ArchroomApp {
@@ -46,30 +131,20 @@ impl ArchroomApp {
             cx.set_render_state(rs);
         }
 
+        archroom_services::set_preview_options(
+            cx.settings.preview_long_edge,
+            cx.settings.preview_jpeg_quality,
+        );
+
         let catalog_path = cx
             .settings
             .last_catalog
             .clone()
             .unwrap_or_else(default_catalog_path);
-        match Catalog::create_or_open(&catalog_path) {
-            Ok(catalog) => {
-                info!(path = %catalog_path.display(), "catalog ready");
-
-                match archroom_services::PreviewCache::open_for_catalog(&catalog_path) {
-                    Ok(previews) => cx.previews = Some(previews),
-                    Err(e) => error!(error = %e, "failed to open preview cache"),
-                }
-
-                cx.settings.last_catalog = Some(catalog_path);
-                if let Err(e) = cx.settings.save() {
-                    error!(error = %e, "failed to save settings");
-                }
-                cx.catalog = Some(catalog);
-            }
-            Err(e) => {
-                error!(path = %catalog_path.display(), error = %e, "failed to open catalog");
-            }
-        }
+        let (backup_rx, problem) = match open_catalog(&mut cx, &catalog_path) {
+            Ok(rx) => (rx, None),
+            Err(problem) => (crossbeam_channel::never(), Some(problem)),
+        };
 
         let registry = ModuleRegistry::new(vec![
             Box::new(archroom_module_library::LibraryModule::new()),
@@ -104,6 +179,10 @@ impl ArchroomApp {
             show_spike_window: false,
             spike_view: SpikeView::default(),
             export_ui: ExportUi::default(),
+            prefs_ui: PreferencesUi::default(),
+            problem,
+            backup_rx,
+            backup_note: None,
         }
     }
 
@@ -119,6 +198,96 @@ impl ArchroomApp {
         }
     }
 
+    fn problem_window(&mut self, ctx: &egui::Context) {
+        let Some(problem) = &self.problem else { return };
+        enum Choice {
+            Restore,
+            OpenAnyway,
+            Quit,
+        }
+        let mut choice = None;
+        egui::Window::new("Catalog problem")
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .collapsible(false)
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.label(&problem.message);
+                ui.monospace(problem.path.display().to_string());
+                ui.add_space(6.0);
+                match problem.backups.first() {
+                    Some(b) => {
+                        ui.label(format!(
+                            "Newest backup: {}",
+                            b.file_name().and_then(|n| n.to_str()).unwrap_or("?")
+                        ));
+                        ui.weak("Restoring keeps the current file next to it as *.damaged-<time>.");
+                    }
+                    None => {
+                        ui.label("There is no backup to restore.");
+                    }
+                }
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    if ui
+                        .add_enabled(
+                            !problem.backups.is_empty(),
+                            egui::Button::new("Restore newest backup"),
+                        )
+                        .clicked()
+                    {
+                        choice = Some(Choice::Restore);
+                    }
+                    if problem.damaged && ui.button("Open anyway").clicked() {
+                        choice = Some(Choice::OpenAnyway);
+                    }
+                    if ui.button("Quit").clicked() {
+                        choice = Some(Choice::Quit);
+                    }
+                });
+            });
+        let Some(choice) = choice else { return };
+        let Some(problem) = self.problem.take() else {
+            return;
+        };
+        match choice {
+            Choice::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+            Choice::OpenAnyway => match Catalog::create_or_open(&problem.path) {
+                Ok(catalog) => {
+                    self.backup_rx = finish_open(&mut self.cx, catalog, &problem.path, false)
+                }
+                Err(e) => {
+                    self.problem = Some(Problem {
+                        message: format!("The catalog could not be opened: {e}"),
+                        damaged: false,
+                        ..problem
+                    });
+                }
+            },
+            Choice::Restore => {
+                let restored = problem
+                    .backups
+                    .first()
+                    .map(|b| restore_backup(&problem.path, b, std::time::SystemTime::now()));
+                match restored {
+                    Some(Ok(moved)) => {
+                        info!(kept = %moved.display(), "restored the catalog from a backup");
+                        match open_catalog(&mut self.cx, &problem.path) {
+                            Ok(rx) => self.backup_rx = rx,
+                            Err(p) => self.problem = Some(p),
+                        }
+                    }
+                    Some(Err(e)) => {
+                        self.problem = Some(Problem {
+                            message: format!("The backup could not be restored: {e}"),
+                            ..problem
+                        });
+                    }
+                    None => self.problem = Some(problem),
+                }
+            }
+        }
+    }
+
     fn handle_global_shortcuts(&mut self, ctx: &egui::Context) {
         let tab_pressed = ctx.input(|i| i.key_pressed(egui::Key::Tab));
         if tab_pressed {
@@ -129,6 +298,15 @@ impl ArchroomApp {
         // only undo stack that exists yet (Develop's is separate, persisted
         // per-photo history, M3 work), so this always targets it; harmless
         // in Develop today since nothing pushes to it from there.
+        if ctx.input_mut(|i| {
+            i.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::COMMAND,
+                egui::Key::Comma,
+            ))
+        }) {
+            self.prefs_ui.toggle(&self.cx);
+        }
+
         // Ctrl+Shift+E opens Export; Ctrl+Alt+Shift+E repeats the last one.
         // (`consume_shortcut` checks the modifiers held when the key event
         // happened, and the more specific shortcut goes first.)
@@ -196,6 +374,17 @@ impl ArchroomApp {
 impl eframe::App for ArchroomApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         self.drain_job_events();
+        if let Ok(outcome) = self.backup_rx.try_recv()
+            && let Some(e) = outcome.error
+        {
+            self.backup_note = Some(format!("The daily catalog backup failed: {e}"));
+        }
+        if self.problem.is_some() {
+            self.problem_window(ctx);
+            // Nothing else runs on a closed catalog.
+            egui::CentralPanel::default().show(ctx, |_| {});
+            return;
+        }
         self.handle_global_shortcuts(ctx);
 
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
@@ -216,6 +405,9 @@ impl eframe::App for ArchroomApp {
                 }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if let Some(note) = &self.backup_note {
+                        ui.colored_label(egui::Color32::from_rgb(0xe0, 0x9a, 0x2b), note);
+                    }
                     if self.active_jobs > 0 {
                         ui.spinner();
                         ui.label(format!(
@@ -225,6 +417,9 @@ impl eframe::App for ArchroomApp {
                         ));
                     }
                     ui.toggle_value(&mut self.show_spike_window, "Spike (M0)");
+                    if ui.button("Preferences…").on_hover_text("Ctrl+,").clicked() {
+                        self.prefs_ui.toggle(&self.cx);
+                    }
                 });
             });
         });
@@ -259,6 +454,7 @@ impl eframe::App for ArchroomApp {
         });
 
         self.export_ui.show(ctx, &mut self.cx);
+        self.prefs_ui.show(ctx, &mut self.cx);
 
         if self.show_spike_window {
             if let Some(render_state) = frame.wgpu_render_state().cloned() {

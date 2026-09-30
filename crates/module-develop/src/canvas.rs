@@ -227,7 +227,7 @@ pub fn show(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
     let rect = ui.available_rect_before_wrap();
     let resp = ui.allocate_rect(rect, egui::Sense::click_and_drag());
     let painter = ui.painter_at(rect);
-    painter.rect_filled(rect, 0.0, egui::Color32::from_gray(0x10));
+    painter.rect_filled(rect, 0.0, cx.center_background());
 
     let Some(doc) = &m.doc else {
         ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {

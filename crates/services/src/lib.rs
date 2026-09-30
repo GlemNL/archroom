@@ -11,6 +11,7 @@
 //! inherent methods on a value it's handed) is re-exported here instead of
 //! read straight off `archroom_catalog`/`archroom_preview`/`archroom_jobs`.
 
+pub mod backup;
 pub mod develop;
 mod error;
 pub mod export;
@@ -28,4 +29,5 @@ pub use archroom_engine as engine;
 pub use archroom_jobs::JobHandle;
 pub use archroom_preview::{
     DEFAULT_PARAMS_HASH, L1_BUDGET_PX, L2_BUDGET_PX, LEVEL_L1, LEVEL_L2, PreviewCache,
+    l2_budget_px, set_preview_options,
 };

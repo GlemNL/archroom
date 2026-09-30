@@ -6,6 +6,8 @@
 //! (Loupe) differ only in target size, so the same functions serve both —
 //! callers pick [`L1_BUDGET_PX`] or [`L2_BUDGET_PX`].
 
+use std::sync::atomic::{AtomicU8, AtomicU32, Ordering};
+
 use archroom_io::ImageF32;
 use fast_image_resize::images::Image as FirImage;
 use fast_image_resize::{IntoImageView, Resizer};
@@ -17,7 +19,25 @@ pub const L1_BUDGET_PX: u32 = 320;
 /// The plan's default "standard" preview size (§5.4); used for Loupe until
 /// M3's real render pipeline replaces this decode-and-resize placeholder.
 pub const L2_BUDGET_PX: u32 = 2048;
-const JPEG_QUALITY: u8 = 85;
+const DEFAULT_JPEG_QUALITY: u8 = 85;
+
+static L2_BUDGET: AtomicU32 = AtomicU32::new(L2_BUDGET_PX);
+static JPEG_QUALITY: AtomicU8 = AtomicU8::new(DEFAULT_JPEG_QUALITY);
+
+/// The user's standard-preview long edge (Preferences); previews generated
+/// from now on use it, existing ones keep their size until regenerated.
+pub fn l2_budget_px() -> u32 {
+    L2_BUDGET.load(Ordering::Relaxed)
+}
+
+pub fn jpeg_quality() -> u8 {
+    JPEG_QUALITY.load(Ordering::Relaxed)
+}
+
+pub fn set_preview_options(long_edge: u32, jpeg_quality: u8) {
+    L2_BUDGET.store(long_edge.clamp(512, 8192), Ordering::Relaxed);
+    JPEG_QUALITY.store(jpeg_quality.clamp(40, 100), Ordering::Relaxed);
+}
 
 /// Re-encodes an already-JPEG embedded thumbnail at `budget_px`.
 pub fn generate_preview_from_jpeg_bytes(
@@ -59,7 +79,7 @@ pub fn encode_jpeg_from_rgba8(rgba: &[u8], width: u32, height: u32) -> Result<Ve
         rgb.extend_from_slice(&px[..3]);
     }
     let mut out = Vec::new();
-    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY)
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, jpeg_quality())
         .write_image(&rgb, width, height, ExtendedColorType::Rgb8)
         .map_err(|e| Error::Other(format!("jpeg encode: {e}")))?;
     Ok(out)
@@ -96,7 +116,7 @@ fn resize_and_encode_jpeg(src: &DynamicImage, budget_px: u32) -> Result<(Vec<u8>
 
     let color: ExtendedColorType = src.color().into();
     let mut out = Vec::new();
-    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY)
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, jpeg_quality())
         .write_image(dst.buffer(), dst_width, dst_height, color)
         .map_err(|e| Error::Other(format!("jpeg encode: {e}")))?;
 

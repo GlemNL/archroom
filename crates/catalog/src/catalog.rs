@@ -62,9 +62,19 @@ impl Catalog {
         }
         let mut dest_conn = Connection::open(dest)?;
         let backup = rusqlite::backup::Backup::new(&self.conn, &mut dest_conn)?;
-        backup.run_to_completion(5, std::time::Duration::from_millis(250), None)?;
+        // Big steps: at 5 pages per 250 ms a 200 MB catalog would take an hour.
+        backup.run_to_completion(2048, std::time::Duration::from_millis(5), None)?;
         info!(dest = %dest.display(), "catalog backed up");
         Ok(())
+    }
+
+    /// `PRAGMA quick_check`: like `integrity_check` without verifying that
+    /// indexes match their tables, so it is cheap enough for every launch.
+    pub fn quick_check(&self) -> Result<bool> {
+        let result: String = self
+            .conn
+            .query_row("PRAGMA quick_check", [], |row| row.get(0))?;
+        Ok(result == "ok")
     }
 
     /// `PRAGMA integrity_check`, run on open in the app (plan §14: catalog

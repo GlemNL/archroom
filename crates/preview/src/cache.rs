@@ -82,7 +82,7 @@ impl PreviewCache {
         let filename = format!("{}_{level}_{:016x}.jpg", photo_id.get(), params_hash as u64);
         let path = self.dir.join(&filename);
         let previous = self.lookup(photo_id, level)?;
-        std::fs::write(&path, jpeg_bytes).map_err(|e| Error::io(&path, e))?;
+        archroom_core::fsutil::write_atomic(&path, jpeg_bytes)?;
         if let Some(old) = previous
             && old != path
         {
@@ -102,6 +102,86 @@ impl PreviewCache {
         Ok(path)
     }
 
+    /// Total size of the preview files on disk, in bytes.
+    pub fn total_bytes(&self) -> u64 {
+        self.files().iter().map(|(_, len, _)| len).sum()
+    }
+
+    /// `(path, bytes, modified)` for every preview file in the index.
+    fn files(&self) -> Vec<(PathBuf, u64, std::time::SystemTime)> {
+        let Ok(mut stmt) = self.conn.prepare("SELECT filename FROM previews") else {
+            return Vec::new();
+        };
+        let names: Vec<String> = stmt
+            .query_map([], |r| r.get(0))
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default();
+        names
+            .into_iter()
+            .filter_map(|n| {
+                let path = self.dir.join(n);
+                let meta = std::fs::metadata(&path).ok()?;
+                Some((path, meta.len(), meta.modified().ok()?))
+            })
+            .collect()
+    }
+
+    /// Housekeeping for the disposable cache: drops index rows whose file
+    /// is gone and files no row points at (e.g. left by a crash), then
+    /// evicts the oldest previews until the files fit in `budget_bytes`.
+    /// Everything removed regenerates on demand. Returns the bytes freed.
+    pub fn trim(&self, budget_bytes: u64) -> Result<u64> {
+        let rows: Vec<(String, i64, String)> = {
+            let mut stmt = self
+                .conn
+                .prepare("SELECT filename, photo_id, level FROM previews")?;
+            stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+                .collect::<rusqlite::Result<_>>()?
+        };
+        let known: std::collections::HashSet<&str> =
+            rows.iter().map(|(f, _, _)| f.as_str()).collect();
+        let mut freed = 0;
+        if let Ok(entries) = std::fs::read_dir(&self.dir) {
+            for e in entries.flatten() {
+                let name = e.file_name().to_string_lossy().into_owned();
+                let stray = name.ends_with(".jpg") && !known.contains(name.as_str())
+                    || name.starts_with('.') && name.ends_with(".tmp");
+                if stray && let Ok(meta) = e.metadata() {
+                    freed += meta.len();
+                    let _ = std::fs::remove_file(e.path());
+                }
+            }
+        }
+        let mut live = Vec::new();
+        for (name, photo, level) in rows {
+            match std::fs::metadata(self.dir.join(&name)) {
+                Ok(meta) => live.push((name, photo, level, meta.len(), meta.modified().ok())),
+                Err(_) => {
+                    self.conn.execute(
+                        "DELETE FROM previews WHERE photo_id = ?1 AND level = ?2",
+                        params![photo, level],
+                    )?;
+                }
+            }
+        }
+        let mut total: u64 = live.iter().map(|r| r.3).sum();
+        // Big standard previews go first, oldest first; thumbnails last.
+        live.sort_by_key(|r| (r.2 == LEVEL_L1, r.4));
+        for (name, photo, level, len, _) in live {
+            if total <= budget_bytes {
+                break;
+            }
+            let _ = std::fs::remove_file(self.dir.join(&name));
+            self.conn.execute(
+                "DELETE FROM previews WHERE photo_id = ?1 AND level = ?2",
+                params![photo, level],
+            )?;
+            total -= len;
+            freed += len;
+        }
+        Ok(freed)
+    }
+
     pub fn lookup(&self, photo_id: PhotoId, level: &str) -> Result<Option<PathBuf>> {
         let filename: Option<String> = self
             .conn
@@ -119,6 +199,45 @@ impl PreviewCache {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn trim_evicts_oldest_large_previews_first_and_sweeps_strays() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = PreviewCache::open_at(dir.path()).unwrap();
+        for id in 1..=3 {
+            cache
+                .store(PhotoId::new(id), LEVEL_L2, 1, &[0u8; 1000], 10, 10)
+                .unwrap();
+            cache
+                .store(PhotoId::new(id), LEVEL_L1, 1, &[0u8; 100], 10, 10)
+                .unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        std::fs::write(dir.path().join("stray.jpg"), [0u8; 50]).unwrap();
+        assert_eq!(cache.total_bytes(), 3300);
+        // Budget for one L2 and all thumbnails.
+        let freed = cache.trim(1300).unwrap();
+        assert_eq!(freed, 2000 + 50);
+        assert!(cache.lookup(PhotoId::new(1), LEVEL_L2).unwrap().is_none());
+        assert!(
+            cache
+                .lookup(PhotoId::new(3), LEVEL_L2)
+                .unwrap()
+                .unwrap()
+                .exists()
+        );
+        for id in 1..=3 {
+            assert!(
+                cache
+                    .lookup(PhotoId::new(id), LEVEL_L1)
+                    .unwrap()
+                    .unwrap()
+                    .exists()
+            );
+        }
+        assert!(!dir.path().join("stray.jpg").exists());
+        assert_eq!(cache.total_bytes(), 1300);
+    }
 
     #[test]
     fn store_then_lookup_round_trips() {

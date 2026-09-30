@@ -11,5 +11,6 @@ pub use cache::{DEFAULT_PARAMS_HASH, LEVEL_L1, LEVEL_L2, PreviewCache};
 pub use error::{Error, Result};
 pub use generate::{
     L1_BUDGET_PX, L2_BUDGET_PX, encode_jpeg_from_rgba8, generate_preview_from_display_rgb,
-    generate_preview_from_jpeg_bytes, generate_preview_from_linear_rgb,
+    generate_preview_from_jpeg_bytes, generate_preview_from_linear_rgb, jpeg_quality, l2_budget_px,
+    set_preview_options,
 };

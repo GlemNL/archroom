@@ -3,6 +3,7 @@
 
 pub mod error;
 pub mod events;
+pub mod fsutil;
 pub mod ids;
 pub mod settings;
 pub mod tracing_setup;

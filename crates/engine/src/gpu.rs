@@ -30,6 +30,19 @@ impl GpuContext {
         }
     }
 
+    /// Names of the Vulkan adapters (for the Preferences GPU picker).
+    pub fn adapter_names() -> Vec<String> {
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::VULKAN,
+            ..Default::default()
+        });
+        instance
+            .enumerate_adapters(wgpu::Backends::VULKAN)
+            .into_iter()
+            .map(|a| a.get_info().name)
+            .collect()
+    }
+
     /// A headless Vulkan device. `ARCHROOM_ADAPTER=<substring>` picks an
     /// adapter by name (e.g. `llvmpipe` for the software fallback used by
     /// CI); otherwise the high-performance one. `None` when there is none.

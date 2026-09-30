@@ -13,7 +13,7 @@ use archroom_engine::{EditParams, Orientation};
 use archroom_io::DecodeOptions;
 use archroom_jobs::{Job, JobContext, Priority};
 use archroom_preview::{
-    L1_BUDGET_PX, L2_BUDGET_PX, LEVEL_L1, LEVEL_L2, PreviewCache, encode_jpeg_from_rgba8,
+    L1_BUDGET_PX, LEVEL_L1, LEVEL_L2, PreviewCache, encode_jpeg_from_rgba8, l2_budget_px,
 };
 
 use crate::error::{Error, Result};
@@ -43,7 +43,7 @@ pub fn rerender(
     cx: &JobContext,
 ) -> Result<()> {
     if params.is_identity() {
-        for (level, budget) in [(LEVEL_L1, L1_BUDGET_PX), (LEVEL_L2, L2_BUDGET_PX)] {
+        for (level, budget) in [(LEVEL_L1, L1_BUDGET_PX), (LEVEL_L2, l2_budget_px())] {
             crate::preview::generate_and_store(previews, &info.path, photo, level, budget)?;
         }
         return Ok(());
@@ -53,7 +53,7 @@ pub fn rerender(
     let decoded = decoder.decode(&info.path, &DecodeOptions::default())?;
     let mut pipeline = Pipeline::new(gpu, &decoded).map_err(|e| Error::Other(e.to_string()))?;
     let hash = params_hash_i64(params);
-    for (level, budget) in [(LEVEL_L2, L2_BUDGET_PX), (LEVEL_L1, L1_BUDGET_PX)] {
+    for (level, budget) in [(LEVEL_L2, l2_budget_px()), (LEVEL_L1, L1_BUDGET_PX)] {
         if cx.is_cancelled() {
             return Ok(());
         }
