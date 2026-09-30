@@ -3,8 +3,8 @@
 //! as opaque JSON text plus the caller-computed hash — `EditParams` lives in
 //! `viberoom-engine`, which this crate must not depend on.
 
-use viberoom_core::ids::PhotoId;
 use rusqlite::{Connection, OptionalExtension, params};
+use viberoom_core::ids::PhotoId;
 
 use crate::error::Result;
 

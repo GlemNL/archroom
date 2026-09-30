@@ -142,9 +142,9 @@ mod tests {
     use crate::gpu::GpuContext;
     use crate::ops::{Exposure, ExposureParams};
     use crate::params::EditParams;
+    use std::time::{Duration, Instant};
     use viberoom_color::cie::SRGB;
     use viberoom_io::{CameraColor, DecodedImage, ImageF32};
-    use std::time::{Duration, Instant};
 
     #[test]
     fn a_burst_of_updates_renders_far_fewer_frames_and_ends_on_the_last() {

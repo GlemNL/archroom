@@ -1,13 +1,13 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use crossbeam_channel::Receiver;
+use tracing::{error, info};
 use viberoom_catalog::Catalog;
 use viberoom_jobs::{JobEventKind, Scheduler};
 use viberoom_services::backup::{BackupJob, BackupOutcome, list_backups, restore_backup};
 use viberoom_services::preview::TrimPreviewsJob;
 use viberoom_shell::{AppCx, ExportRequestKind, ExportUi, ModuleRegistry, PreferencesUi};
-use crossbeam_channel::Receiver;
-use tracing::{error, info};
 
 /// `~/Pictures/Viberoom/Viberoom.arcat`, the default catalog location
 /// (plan §4.7). Falls back to `~/Viberoom/Viberoom.arcat` if the platform

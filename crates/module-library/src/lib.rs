@@ -14,11 +14,11 @@ mod photos;
 mod right_panel;
 mod shortcuts;
 
-use viberoom_services::command::{RotatePhotos, SetFlag};
-use viberoom_shell::{AppCx, ExportRequestKind, Module, ModuleId};
 use import_dialog::ImportDialogState;
 use photos::LibraryData;
 use right_panel::RightPanelState;
+use viberoom_services::command::{RotatePhotos, SetFlag};
+use viberoom_shell::{AppCx, ExportRequestKind, Module, ModuleId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum View {

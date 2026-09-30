@@ -2,11 +2,11 @@
 //! `develop_settings`/`history` tables. The catalog stores opaque JSON;
 //! the hash and the identity rule ("unedited ⇒ no row") live here.
 
+use rusqlite::Connection;
 use viberoom_catalog::develop::{self, DevelopRow};
 use viberoom_core::events::{CatalogEvent, PhotoField};
 use viberoom_core::ids::PhotoId;
 use viberoom_engine::EditParams;
-use rusqlite::Connection;
 
 use crate::error::Result;
 

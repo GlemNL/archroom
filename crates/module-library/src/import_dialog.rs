@@ -13,12 +13,12 @@
 
 use std::path::PathBuf;
 
+use crossbeam_channel::Receiver;
 use viberoom_core::events::CatalogEvent;
 use viberoom_core::ids::ImportId;
 use viberoom_services::JobHandle;
 use viberoom_services::import::{ImportJob, ImportMode, ImportOptions};
 use viberoom_shell::AppCx;
-use crossbeam_channel::Receiver;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ModeChoice {

@@ -6,10 +6,10 @@
 //! sets rating/flag/label yet (that's M2); the point is the Grid doesn't
 //! need to change when M2 lands.
 
+use egui::{Color32, CornerRadius, Sense, Stroke, Vec2};
 use viberoom_core::ids::PhotoId;
 use viberoom_services::repo::PhotoSummary;
 use viberoom_shell::AppCx;
-use egui::{Color32, CornerRadius, Sense, Stroke, Vec2};
 
 const LABEL_HEIGHT: f32 = 20.0;
 const CELL_SPACING: f32 = 6.0;

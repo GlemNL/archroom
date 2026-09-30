@@ -5,9 +5,9 @@ use rayon::prelude::*;
 use std::ffi::CString;
 use std::path::Path;
 
+use libraw_sys as sys;
 use viberoom_color::Mat3;
 use viberoom_core::{Error, Result};
-use libraw_sys as sys;
 
 use crate::types::{
     CameraColor, DecodeOptions, DecodedImage, Decoder, ImageF32, ImageMetadata, Priority,

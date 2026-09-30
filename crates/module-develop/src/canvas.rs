@@ -2,11 +2,11 @@
 //! pan, before/after, clipping overlay and the white-balance eyedropper,
 //! plus the toolbar and Develop's keyboard shortcuts.
 
+use egui::Modifiers;
 use viberoom_core::settings::ClickZoom;
 use viberoom_services::LEVEL_L2;
 use viberoom_services::engine::ops::{WbMode, WhiteBalance, WhiteBalanceParams};
 use viberoom_shell::AppCx;
-use egui::Modifiers;
 
 use crate::basic::Change;
 use crate::copy_dialog::{CopyDialog, Mode};

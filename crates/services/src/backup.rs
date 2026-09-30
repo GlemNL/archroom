@@ -6,9 +6,9 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use crossbeam_channel::Sender;
 use viberoom_catalog::Catalog;
 use viberoom_jobs::{Job, JobContext, Priority};
-use crossbeam_channel::Sender;
 
 use crate::error::{Error, Result};
 

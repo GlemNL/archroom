@@ -4,11 +4,11 @@
 
 use std::collections::BTreeSet;
 
+use crossbeam_channel::Receiver;
 use viberoom_core::events::CatalogEvent;
 use viberoom_services::collections::{self, CollectionRow, PhotoSource};
 use viberoom_services::repo::{self, FolderRow, PhotoSort, PhotoSummary};
 use viberoom_shell::{AppCx, LibrarySource};
-use crossbeam_channel::Receiver;
 
 use crate::filter_bar::FilterState;
 
