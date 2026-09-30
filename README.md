@@ -132,7 +132,7 @@ cd packaging && makepkg -si
 ### Run
 
 ```sh
-git clone https://github.com/archroom/archroom
+git clone https://github.com/GlemNL/archroom
 cd archroom
 cargo run --release -p archroom-app
 ```

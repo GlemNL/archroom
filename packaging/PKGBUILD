@@ -4,7 +4,7 @@ pkgver=0.1.0
 pkgrel=1
 pkgdesc='Photo catalog and raw developer with a Lightroom-style workflow (Library and Develop)'
 arch=('x86_64')
-url='https://github.com/archroom/archroom'
+url='https://github.com/GlemNL/archroom'
 license=('GPL-3.0-or-later')
 depends=('gcc-libs' 'glibc' 'lcms2' 'libgexiv2' 'libraw' 'vulkan-icd-loader'
          'libxkbcommon' 'wayland')

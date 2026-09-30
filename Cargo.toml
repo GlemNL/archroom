@@ -25,7 +25,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/archroom/archroom"
+repository = "https://github.com/GlemNL/archroom"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "warn"
