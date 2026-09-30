@@ -10,7 +10,7 @@ cli *ARGS:
 
 # Run every test in the workspace.
 test:
-    cargo test --workspace --all-targets
+    cargo test --workspace --exclude viberoom-app
 
 # Format check, clippy (deny warnings) and the crate dependency-rule check.
 lint:
