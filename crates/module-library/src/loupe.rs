@@ -11,6 +11,7 @@
 //! fast-follow, not required for M1 Phase C.
 
 use archroom_core::ids::PhotoId;
+use archroom_core::settings::ClickZoom;
 use archroom_services::repo::{FolderRow, PhotoSummary};
 use archroom_shell::AppCx;
 
@@ -19,6 +20,18 @@ pub enum Zoom {
     #[default]
     Fit,
     OneToOne,
+    TwoToOne,
+}
+
+impl Zoom {
+    /// The view a click on the photo toggles to; `None` when clicking is off.
+    pub fn from_click(z: ClickZoom) -> Option<Zoom> {
+        match z {
+            ClickZoom::Off => None,
+            ClickZoom::OneToOne => Some(Zoom::OneToOne),
+            ClickZoom::TwoToOne => Some(Zoom::TwoToOne),
+        }
+    }
 }
 
 pub fn photo_absolute_path(
@@ -35,21 +48,21 @@ pub fn show(
     photos: &[PhotoSummary],
     folders: &[FolderRow],
     zoom: Zoom,
-) {
+) -> Option<Zoom> {
     let ordered: Vec<PhotoId> = photos.iter().map(|p| p.photo_id).collect();
     handle_prev_next(ui, cx, &ordered);
 
     let Some(active) = cx.selection.active else {
         ui.centered_and_justified(|ui| ui.label("Select a photo to view."));
-        return;
+        return None;
     };
     let Some(photo) = photos.iter().find(|p| p.photo_id == active) else {
         ui.centered_and_justified(|ui| ui.label("Select a photo to view."));
-        return;
+        return None;
     };
     let Some(path) = photo_absolute_path(folders, photo) else {
         ui.centered_and_justified(|ui| ui.label("This photo's file location is unknown."));
-        return;
+        return None;
     };
 
     let preview_path = cx.previews.as_ref().and_then(|previews| {
@@ -70,15 +83,31 @@ pub fn show(
 
     let Some(preview_path) = preview_path else {
         ui.centered_and_justified(|ui| ui.label(format!("Couldn't render {}", photo.filename)));
-        return;
+        return None;
     };
 
     let uri = format!("file://{}", preview_path.display());
     let angle = crate::grid::orientation_angle(photo);
     let odd_turns = photo.user_orientation % 2 != 0;
-    egui::ScrollArea::both()
-        .auto_shrink([false, false])
-        .show(ui, |ui| match zoom {
+    // The scroll offset that keeps the clicked image point under the
+    // pointer, set at a zoom-in click and applied on the next frame (a
+    // direct offset: `scroll_with_delta` would animate).
+    let anchor_id = egui::Id::new("loupe_zoom_anchor");
+    let anchor: Option<egui::Vec2> = ui.data_mut(|d| d.remove_temp(anchor_id));
+    let viewport = ui.available_rect_before_wrap();
+    let visual = |r: egui::Rect| {
+        if odd_turns {
+            egui::Rect::from_center_size(r.center(), egui::vec2(r.height(), r.width()))
+        } else {
+            r
+        }
+    };
+    let mut clicked: Option<(egui::Pos2, egui::Vec2)> = None;
+    let mut area = egui::ScrollArea::both().auto_shrink([false, false]);
+    if let Some(offset) = anchor {
+        area = area.scroll_offset(offset);
+    }
+    area.show(ui, |ui| match zoom {
             Zoom::Fit => {
                 let available = ui.available_size();
                 // The rotated quad has swapped dimensions, so an odd
@@ -97,17 +126,56 @@ pub fn show(
                     if angle != 0.0 {
                         image = image.rotate(angle, egui::Vec2::splat(0.5));
                     }
-                    ui.add(image);
+                    let r = ui.add(image.sense(egui::Sense::click()));
+                    if r.clicked() {
+                        clicked = r.interact_pointer_pos().map(|p| {
+                            let v = visual(r.rect);
+                            (p, (p - v.min) / v.size())
+                        });
+                    }
                 });
             }
-            Zoom::OneToOne => {
-                let mut image = egui::Image::from_uri(uri.clone());
+            Zoom::OneToOne | Zoom::TwoToOne => {
+                let scale = if zoom == Zoom::TwoToOne { 2.0 } else { 1.0 };
+                let mut image = egui::Image::from_uri(uri.clone())
+                    .fit_to_original_size(scale)
+                    .sense(egui::Sense::click());
                 if angle != 0.0 {
                     image = image.rotate(angle, egui::Vec2::splat(0.5));
                 }
-                ui.add(image);
+                let r = ui.add(image);
+                if r.clicked() {
+                    clicked = r.interact_pointer_pos().map(|p| {
+                        let v = visual(r.rect);
+                        (p, (p - v.min) / v.size())
+                    });
+                }
             }
         });
+    // A left-click toggles between Fit and the configured zoom.
+    if let Some((pos, frac)) = clicked
+        && let Some(target) = Zoom::from_click(cx.settings.click_zoom)
+    {
+        if zoom == Zoom::Fit {
+            let scale = if target == Zoom::TwoToOne { 2.0 } else { 1.0 };
+            let tex = egui::Image::from_uri(uri.clone())
+                .load_for_size(ui.ctx(), viewport.size())
+                .ok()
+                .and_then(|poll| poll.size());
+            if let Some(tex) = tex {
+                // Laid-out size `a`, painted (rotated) size `v`, both centred.
+                let a = tex * scale;
+                let v = if odd_turns { egui::vec2(a.y, a.x) } else { a };
+                let point = a / 2.0 + (frac - egui::Vec2::splat(0.5)) * v;
+                let max = (a - viewport.size()).max(egui::Vec2::ZERO);
+                let offset = (point - (pos - viewport.min)).clamp(egui::Vec2::ZERO, max);
+                ui.data_mut(|d| d.insert_temp(anchor_id, offset));
+                ui.ctx().request_repaint();
+            }
+        }
+        return Some(if zoom == Zoom::Fit { target } else { Zoom::Fit });
+    }
+    None
 }
 
 fn handle_prev_next(ui: &egui::Ui, cx: &mut AppCx, ordered: &[PhotoId]) {

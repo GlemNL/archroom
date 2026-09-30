@@ -18,6 +18,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut AppCx) {
     let last: Option<i64> = ui.data(|d| d.get_temp(key));
     let now = cx.selection.active.map(PhotoId::get);
     let scroll_to_active = now != last;
+    archroom_shell::wheel_scrolls_horizontally(ui);
     egui::ScrollArea::horizontal()
         .auto_shrink([false, false])
         .show(ui, |ui| {

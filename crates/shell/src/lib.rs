@@ -11,9 +11,11 @@ mod module;
 mod registry;
 mod selection;
 mod undo;
+mod view_input;
 
 pub use appcx::{AppCx, RenderStateHandle};
 pub use module::{Action, Module, ModuleId};
 pub use registry::ModuleRegistry;
 pub use selection::{LibrarySource, Selection};
 pub use undo::UndoStack;
+pub use view_input::{click_zoom_picker, wheel_scrolls_horizontally};

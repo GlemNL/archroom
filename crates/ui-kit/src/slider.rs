@@ -101,6 +101,13 @@ impl Widget for LrSlider<'_> {
             }
             let label_response = label_response.on_hover_text("Double-click to reset");
 
+            // The track takes whatever the row has left after the value box,
+            // so the slider follows the side panel's width.
+            const VALUE_WIDTH: f32 = 56.0;
+            let spacing = ui.spacing().item_spacing.x;
+            ui.spacing_mut().slider_width =
+                (ui.available_width() - VALUE_WIDTH - spacing).max(40.0);
+
             let drag_response = ui.add(
                 egui::Slider::new(value, range.clone())
                     .show_value(false)
@@ -127,7 +134,7 @@ impl Widget for LrSlider<'_> {
             if let Some(parse) = parser {
                 drag = drag.custom_parser(move |s| parse(s).map(f64::from));
             }
-            ui.add_sized([56.0, ui.spacing().interact_size.y], drag);
+            ui.add_sized([VALUE_WIDTH, ui.spacing().interact_size.y], drag);
 
             label_response | drag_response
         })

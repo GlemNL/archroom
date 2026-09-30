@@ -115,6 +115,13 @@ impl Module for LibraryModule {
                 {
                     self.zoom = loupe::Zoom::OneToOne;
                 }
+                if ui
+                    .selectable_label(self.zoom == loupe::Zoom::TwoToOne, "2:1")
+                    .clicked()
+                {
+                    self.zoom = loupe::Zoom::TwoToOne;
+                }
+                archroom_shell::click_zoom_picker(ui, cx);
             }
         }
 
@@ -210,7 +217,11 @@ impl Module for LibraryModule {
                     }
                 }
                 View::Loupe => {
-                    loupe::show(ui, cx, &self.data.photos, &self.data.folders, self.zoom);
+                    if let Some(z) =
+                        loupe::show(ui, cx, &self.data.photos, &self.data.folders, self.zoom)
+                    {
+                        self.zoom = z;
+                    }
                 }
             }
         }

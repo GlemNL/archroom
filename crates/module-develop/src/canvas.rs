@@ -2,6 +2,7 @@
 //! pan, before/after, clipping overlay and the white-balance eyedropper,
 //! plus the toolbar and Develop's keyboard shortcuts.
 
+use archroom_core::settings::ClickZoom;
 use archroom_services::LEVEL_L2;
 use archroom_services::engine::ops::{WbMode, WhiteBalance, WhiteBalanceParams};
 use archroom_shell::AppCx;
@@ -10,6 +11,26 @@ use egui::Modifiers;
 use crate::basic::Change;
 use crate::copy_dialog::{CopyDialog, Mode};
 use crate::{DevelopModule, Zoom};
+
+/// How long the Fit/1:1/2:1 transition takes, in seconds.
+const ZOOM_ANIM_SECS: f64 = 0.15;
+
+/// A running zoom transition, from the image size and pan that were drawn
+/// when the zoom changed.
+#[derive(Debug, Clone, Copy)]
+pub struct ZoomAnim {
+    start: f64,
+    from_size: egui::Vec2,
+    from_pan: egui::Vec2,
+}
+
+fn zoom_from_click(z: ClickZoom) -> Option<Zoom> {
+    match z {
+        ClickZoom::Off => None,
+        ClickZoom::OneToOne => Some(Zoom::OneToOne),
+        ClickZoom::TwoToOne => Some(Zoom::TwoToOne),
+    }
+}
 
 pub fn toolbar(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
     for (z, name) in [
@@ -22,6 +43,7 @@ pub fn toolbar(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
             m.pan = egui::Vec2::ZERO;
         }
     }
+    archroom_shell::click_zoom_picker(ui, cx);
     ui.separator();
     let mut tool_on = m.crop_tool.is_some();
     if ui
@@ -266,7 +288,7 @@ pub fn show(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
     );
     let (ow, oh) = geom.crop_px();
     let (ow, oh) = (ow as f32, oh as f32);
-    let size = match m.zoom.factor() {
+    let mut size = match m.zoom.factor() {
         None => {
             let s = (rect.width() / ow).min(rect.height() / oh);
             egui::vec2(ow * s, oh * s)
@@ -281,15 +303,67 @@ pub fn show(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
     }
     let max_pan = ((size - rect.size()) / 2.0).max(egui::Vec2::ZERO);
     m.pan = m.pan.clamp(-max_pan, max_pan);
-    if resp.double_clicked() && !m.eyedropper && !tool_open {
-        m.zoom = if m.zoom == Zoom::Fit {
-            Zoom::OneToOne
-        } else {
-            Zoom::Fit
-        };
+    // A left-click toggles between Fit and the configured zoom.
+    if resp.clicked_by(egui::PointerButton::Primary)
+        && !m.eyedropper
+        && !tool_open
+        && let Some(target) = zoom_from_click(cx.settings.click_zoom)
+    {
+        // Zooming in keeps the image point under the pointer in place.
+        let anchor = resp.interact_pointer_pos().filter(|_| m.zoom == Zoom::Fit);
+        let old_center = rect.center() + m.pan;
+        m.zoom = if m.zoom == Zoom::Fit { target } else { Zoom::Fit };
         m.pan = egui::Vec2::ZERO;
+        if let (Some(pos), Some(z)) = (anchor, m.zoom.factor()) {
+            let frac = (pos - old_center) / size;
+            size = egui::vec2(ow * z / ppp, oh * z / ppp);
+            let max_pan = ((size - rect.size()) / 2.0).max(egui::Vec2::ZERO);
+            m.pan = (pos - frac * size - rect.center()).clamp(-max_pan, max_pan);
+        } else {
+            size = match m.zoom.factor() {
+                None => {
+                    let s = (rect.width() / ow).min(rect.height() / oh);
+                    egui::vec2(ow * s, oh * s)
+                }
+                Some(z) => egui::vec2(ow * z / ppp, oh * z / ppp),
+            };
+        }
+        m.want_edge = ((size.max_elem() * ppp).ceil() as u32).clamp(256, 4096);
     }
-    let img_rect = egui::Rect::from_center_size(rect.center() + m.pan, size);
+    // Ease from the previously drawn view to the new one whenever the zoom
+    // changes. Center and size both move linearly, so the point under the
+    // pointer at a click stays under it throughout.
+    let now = ui.input(|i| i.time);
+    if m.zoom != m.last_zoom {
+        m.last_zoom = m.zoom;
+        m.zoom_anim = (m.drawn.0.x > 0.0).then_some(ZoomAnim {
+            start: now,
+            from_size: m.drawn.0,
+            from_pan: m.drawn.1,
+        });
+    }
+    if resp.dragged() {
+        m.zoom_anim = None;
+    }
+    let (draw_size, draw_pan) = match m.zoom_anim {
+        Some(a) => {
+            let t = ((now - a.start) / ZOOM_ANIM_SECS) as f32;
+            if t >= 1.0 {
+                m.zoom_anim = None;
+                (size, m.pan)
+            } else {
+                let e = 1.0 - (1.0 - t).powi(3);
+                ui.ctx().request_repaint();
+                (
+                    a.from_size + (size - a.from_size) * e,
+                    a.from_pan + (m.pan - a.from_pan) * e,
+                )
+            }
+        }
+        None => (size, m.pan),
+    };
+    m.drawn = (draw_size, draw_pan);
+    let img_rect = egui::Rect::from_center_size(rect.center() + draw_pan, draw_size);
     // The left panel (Navigator) draws before this runs, so it sees last
     // frame's view; ask for one more frame when the view moved.
     let view = crate::ViewInfo {

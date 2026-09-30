@@ -15,6 +15,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut AppCx, photos: &[PhotoSummary]) {
         return;
     }
 
+    archroom_shell::wheel_scrolls_horizontally(ui);
     egui::ScrollArea::horizontal()
         .auto_shrink([false, false])
         .show(ui, |ui| {

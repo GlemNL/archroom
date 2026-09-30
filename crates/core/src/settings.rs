@@ -31,6 +31,18 @@ pub enum XmpAutoWrite {
     On,
 }
 
+/// What a left-click on a full-screen photo (Loupe, Develop canvas) toggles
+/// against the fit view.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClickZoom {
+    /// Clicking does nothing.
+    Off,
+    OneToOne,
+    #[default]
+    TwoToOne,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -38,6 +50,8 @@ pub struct Settings {
     pub last_catalog: Option<PathBuf>,
     pub center_background: CenterBackground,
     pub xmp_auto_write: XmpAutoWrite,
+    /// The zoom a click on a full-screen photo toggles to from Fit.
+    pub click_zoom: ClickZoom,
     /// Standard-preview long edge in pixels (L2, plan §5.4).
     pub preview_long_edge: u32,
     pub preview_jpeg_quality: u8,
@@ -53,6 +67,7 @@ impl Default for Settings {
             last_catalog: None,
             center_background: CenterBackground::default(),
             xmp_auto_write: XmpAutoWrite::default(),
+            click_zoom: ClickZoom::default(),
             preview_long_edge: 2048,
             preview_jpeg_quality: 90,
             cache_budget_mb: 5 * 1024,

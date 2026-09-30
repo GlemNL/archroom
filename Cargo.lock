@@ -480,6 +480,7 @@ dependencies = [
  "egui-wgpu",
  "rusqlite",
  "tempfile",
+ "tracing",
 ]
 
 [[package]]

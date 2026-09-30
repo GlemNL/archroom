@@ -22,7 +22,7 @@ use archroom_core::ids::PhotoId;
 use archroom_services::catalog_develop::{HistoryRow, SnapshotRow};
 use archroom_services::engine::ops::{Profile, Treatment, default_registry};
 use archroom_services::engine::pipeline::{Histogram, RenderRequest};
-use archroom_services::engine::{EditParams, Registry};
+use archroom_services::engine::{EditParams, Orientation, Registry};
 use archroom_services::presets::Preset;
 use archroom_services::repo::{self, PhotoFileInfo};
 use archroom_services::rerender::RerenderPreviewsJob;
@@ -96,6 +96,12 @@ pub struct DevelopModule {
     doc: Option<Doc>,
     registry: Registry,
     zoom: Zoom,
+    /// The zoom last frame, to notice a change and start the animation.
+    last_zoom: Zoom,
+    zoom_anim: Option<canvas::ZoomAnim>,
+    /// The image size and pan actually drawn last frame (mid-animation
+    /// these differ from the zoom's own).
+    drawn: (egui::Vec2, egui::Vec2),
     pan: egui::Vec2,
     clip: bool,
     before: bool,
@@ -125,6 +131,9 @@ impl DevelopModule {
             doc: None,
             registry: default_registry(),
             zoom: Zoom::Fit,
+            last_zoom: Zoom::Fit,
+            zoom_anim: None,
+            drawn: (egui::Vec2::ZERO, egui::Vec2::ZERO),
             pan: egui::Vec2::ZERO,
             clip: false,
             before: false,
@@ -286,6 +295,8 @@ impl DevelopModule {
         self.before = false;
         self.pan = egui::Vec2::ZERO;
         self.zoom = Zoom::Fit;
+        self.last_zoom = Zoom::Fit;
+        self.zoom_anim = None;
         let (Some(photo), Some(catalog)) = (photo, &cx.catalog) else {
             return;
         };
@@ -688,6 +699,25 @@ impl Module for DevelopModule {
 
     fn title(&self) -> &str {
         "Develop"
+    }
+
+    fn on_enter(&mut self, cx: &mut AppCx) {
+        // The Library may have rotated the open photo since it was loaded.
+        let (Some(catalog), Some(doc)) = (&cx.catalog, &mut self.doc) else {
+            return;
+        };
+        let Ok(Some(info)) = repo::photo_file_info(catalog.connection(), doc.photo) else {
+            return;
+        };
+        if let Some(session) = &mut doc.session {
+            let orientation = Orientation::from_exif(info.exif_orientation)
+                .rotated(info.user_orientation);
+            if session.orientation != orientation {
+                session.orientation = orientation;
+                doc.last_key = None;
+            }
+        }
+        doc.info = Some(info);
     }
 
     fn on_leave(&mut self, cx: &mut AppCx) {
