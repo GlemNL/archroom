@@ -30,6 +30,8 @@ fn zoom_from_click(z: ClickZoom) -> Option<Zoom> {
         ClickZoom::Off => None,
         ClickZoom::OneToOne => Some(Zoom::OneToOne),
         ClickZoom::TwoToOne => Some(Zoom::TwoToOne),
+        ClickZoom::ThreeToOne => Some(Zoom::ThreeToOne),
+        ClickZoom::FiveToOne => Some(Zoom::FiveToOne),
     }
 }
 
@@ -38,6 +40,8 @@ pub fn toolbar(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
         (Zoom::Fit, "Fit"),
         (Zoom::OneToOne, "1:1"),
         (Zoom::TwoToOne, "2:1"),
+        (Zoom::ThreeToOne, "3:1"),
+        (Zoom::FiveToOne, "5:1"),
     ] {
         if ui.selectable_label(m.zoom == z, name).clicked() {
             m.zoom = z;

@@ -44,6 +44,8 @@ enum Zoom {
     Fit,
     OneToOne,
     TwoToOne,
+    ThreeToOne,
+    FiveToOne,
 }
 
 impl Zoom {
@@ -52,6 +54,8 @@ impl Zoom {
             Zoom::Fit => None,
             Zoom::OneToOne => Some(1.0),
             Zoom::TwoToOne => Some(2.0),
+            Zoom::ThreeToOne => Some(3.0),
+            Zoom::FiveToOne => Some(5.0),
         }
     }
 }

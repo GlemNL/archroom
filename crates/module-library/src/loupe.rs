@@ -20,15 +20,30 @@ pub enum Zoom {
     Fit,
     OneToOne,
     TwoToOne,
+    ThreeToOne,
+    FiveToOne,
 }
 
 impl Zoom {
+    /// Display pixels per preview pixel; `None` for Fit.
+    fn factor(self) -> Option<f32> {
+        match self {
+            Zoom::Fit => None,
+            Zoom::OneToOne => Some(1.0),
+            Zoom::TwoToOne => Some(2.0),
+            Zoom::ThreeToOne => Some(3.0),
+            Zoom::FiveToOne => Some(5.0),
+        }
+    }
+
     /// The view a click on the photo toggles to; `None` when clicking is off.
     pub fn from_click(z: ClickZoom) -> Option<Zoom> {
         match z {
             ClickZoom::Off => None,
             ClickZoom::OneToOne => Some(Zoom::OneToOne),
             ClickZoom::TwoToOne => Some(Zoom::TwoToOne),
+            ClickZoom::ThreeToOne => Some(Zoom::ThreeToOne),
+            ClickZoom::FiveToOne => Some(Zoom::FiveToOne),
         }
     }
 }
@@ -137,8 +152,8 @@ pub fn show(
                 }
             });
         }
-        Zoom::OneToOne | Zoom::TwoToOne => {
-            let scale = if zoom == Zoom::TwoToOne { 2.0 } else { 1.0 };
+        Zoom::OneToOne | Zoom::TwoToOne | Zoom::ThreeToOne | Zoom::FiveToOne => {
+            let scale = zoom.factor().unwrap_or(1.0);
             let mut image = egui::Image::from_uri(uri.clone())
                 .fit_to_original_size(scale)
                 .sense(egui::Sense::click());
@@ -159,7 +174,7 @@ pub fn show(
         && let Some(target) = Zoom::from_click(cx.settings.click_zoom)
     {
         if zoom == Zoom::Fit {
-            let scale = if target == Zoom::TwoToOne { 2.0 } else { 1.0 };
+            let scale = target.factor().unwrap_or(1.0);
             let tex = egui::Image::from_uri(uri.clone())
                 .load_for_size(ui.ctx(), viewport.size())
                 .ok()

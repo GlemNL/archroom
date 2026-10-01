@@ -103,23 +103,16 @@ impl Module for LibraryModule {
                 ui.add(egui::Slider::new(&mut self.thumbnail_size, 80.0..=320.0).show_value(false));
             }
             View::Loupe => {
-                if ui
-                    .selectable_label(self.zoom == loupe::Zoom::Fit, "Fit")
-                    .clicked()
-                {
-                    self.zoom = loupe::Zoom::Fit;
-                }
-                if ui
-                    .selectable_label(self.zoom == loupe::Zoom::OneToOne, "1:1")
-                    .clicked()
-                {
-                    self.zoom = loupe::Zoom::OneToOne;
-                }
-                if ui
-                    .selectable_label(self.zoom == loupe::Zoom::TwoToOne, "2:1")
-                    .clicked()
-                {
-                    self.zoom = loupe::Zoom::TwoToOne;
+                for (z, name) in [
+                    (loupe::Zoom::Fit, "Fit"),
+                    (loupe::Zoom::OneToOne, "1:1"),
+                    (loupe::Zoom::TwoToOne, "2:1"),
+                    (loupe::Zoom::ThreeToOne, "3:1"),
+                    (loupe::Zoom::FiveToOne, "5:1"),
+                ] {
+                    if ui.selectable_label(self.zoom == z, name).clicked() {
+                        self.zoom = z;
+                    }
                 }
                 viberoom_shell::click_zoom_picker(ui, cx);
             }

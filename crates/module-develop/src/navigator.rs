@@ -9,6 +9,8 @@ pub fn show(ui: &mut egui::Ui, m: &mut DevelopModule) {
             (Zoom::Fit, "Fit"),
             (Zoom::OneToOne, "1:1"),
             (Zoom::TwoToOne, "2:1"),
+            (Zoom::ThreeToOne, "3:1"),
+            (Zoom::FiveToOne, "5:1"),
         ] {
             if ui.selectable_label(m.zoom == z, name).clicked() && m.tool.is_none() {
                 m.zoom = z;

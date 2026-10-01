@@ -41,6 +41,8 @@ pub enum ClickZoom {
     OneToOne,
     #[default]
     TwoToOne,
+    ThreeToOne,
+    FiveToOne,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

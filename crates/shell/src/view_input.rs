@@ -27,13 +27,21 @@ pub fn click_zoom_picker(ui: &mut egui::Ui, cx: &mut AppCx) {
         ClickZoom::Off => "Off",
         ClickZoom::OneToOne => "1:1",
         ClickZoom::TwoToOne => "2:1",
+        ClickZoom::ThreeToOne => "3:1",
+        ClickZoom::FiveToOne => "5:1",
     };
     ui.label("Click zoom:");
     egui::ComboBox::from_id_salt("click_zoom")
         .selected_text(name(before))
         .width(60.0)
         .show_ui(ui, |ui| {
-            for z in [ClickZoom::TwoToOne, ClickZoom::OneToOne, ClickZoom::Off] {
+            for z in [
+                ClickZoom::TwoToOne,
+                ClickZoom::ThreeToOne,
+                ClickZoom::FiveToOne,
+                ClickZoom::OneToOne,
+                ClickZoom::Off,
+            ] {
                 ui.selectable_value(&mut cx.settings.click_zoom, z, name(z));
             }
         })

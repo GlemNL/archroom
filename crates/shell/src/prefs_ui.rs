@@ -191,6 +191,8 @@ impl PreferencesUi {
                         (ClickZoom::Off, "Nothing"),
                         (ClickZoom::OneToOne, "Zoom 1:1"),
                         (ClickZoom::TwoToOne, "Zoom 2:1"),
+                        (ClickZoom::ThreeToOne, "Zoom 3:1"),
+                        (ClickZoom::FiveToOne, "Zoom 5:1"),
                     ] {
                         ui.selectable_value(&mut s.click_zoom, z, name);
                     }
