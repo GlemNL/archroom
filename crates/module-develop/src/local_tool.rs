@@ -641,6 +641,14 @@ impl LocalTool {
             }
         }
         let alt = ui.input(|i| i.modifiers.alt);
+        // The wheel resizes the brush like the Size slider (~10% a notch).
+        if resp.hovered() {
+            let scroll = ui.input(|i| i.raw_scroll_delta.y);
+            if scroll != 0.0 {
+                let f = (f64::from(scroll) * 0.002).exp();
+                self.brush.size = (self.brush.size * f).clamp(0.002, 0.3);
+            }
+        }
         let radius = v.len_px(self.brush.size) / 2.0;
         if let Some(pos) = resp.hover_pos() {
             ui.ctx().set_cursor_icon(CursorIcon::None);
