@@ -2168,7 +2168,7 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "libraw-sys"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bindgen",
  "pkg-config",
@@ -4130,7 +4130,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "viberoom-app"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "crossbeam-channel",
@@ -4152,7 +4152,7 @@ dependencies = [
 
 [[package]]
 name = "viberoom-catalog"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "rusqlite",
  "rusqlite_migration",
@@ -4167,7 +4167,7 @@ dependencies = [
 
 [[package]]
 name = "viberoom-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -4184,7 +4184,7 @@ dependencies = [
 
 [[package]]
 name = "viberoom-color"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "approx",
  "lcms2",
@@ -4196,7 +4196,7 @@ dependencies = [
 
 [[package]]
 name = "viberoom-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "crossbeam-channel",
  "directories",
@@ -4211,7 +4211,7 @@ dependencies = [
 
 [[package]]
 name = "viberoom-engine"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "approx",
  "bytemuck",
@@ -4233,7 +4233,7 @@ dependencies = [
 
 [[package]]
 name = "viberoom-io"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "image",
  "libraw-sys",
@@ -4248,7 +4248,7 @@ dependencies = [
 
 [[package]]
 name = "viberoom-jobs"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "crossbeam-channel",
  "rayon",
@@ -4258,7 +4258,7 @@ dependencies = [
 
 [[package]]
 name = "viberoom-module-develop"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "crossbeam-channel",
  "egui",
@@ -4273,7 +4273,7 @@ dependencies = [
 
 [[package]]
 name = "viberoom-module-library"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "crossbeam-channel",
  "egui",
@@ -4288,7 +4288,7 @@ dependencies = [
 
 [[package]]
 name = "viberoom-preview"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "fast_image_resize",
  "image",
@@ -4304,7 +4304,7 @@ dependencies = [
 
 [[package]]
 name = "viberoom-services"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "crossbeam-channel",
  "image",
@@ -4332,7 +4332,7 @@ dependencies = [
 
 [[package]]
 name = "viberoom-shell"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "crossbeam-channel",
  "egui",
@@ -4351,7 +4351,7 @@ dependencies = [
 
 [[package]]
 name = "viberoom-ui"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "egui",
  "egui_extras",
@@ -5427,7 +5427,7 @@ checksum = "e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7"
 
 [[package]]
 name = "xtask"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "serde",

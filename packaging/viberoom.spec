@@ -4,7 +4,7 @@
 %global debug_package %{nil}
 
 Name:           viberoom
-Version:        0.1.0
+Version:        0.2.0
 Release:        1%{?dist}
 Summary:        Photo catalog and raw developer with a Lightroom-style workflow
 License:        GPL-3.0-or-later
@@ -52,5 +52,8 @@ install -Dm644 assets/viberoom.svg \
 %{_datadir}/icons/hicolor/scalable/apps/viberoom.svg
 
 %changelog
+* Thu Oct 01 2026 Clément L <a.kenbari@gmail.com> - 0.2.0-1
+- Local adjustments (red eye, gradients, brush zones), crop rotation, remove/trash/missing files
+
 * Wed Sep 30 2026 Clément L <a.kenbari@gmail.com> - 0.1.0-1
 - Initial release
