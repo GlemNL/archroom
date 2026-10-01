@@ -36,10 +36,10 @@ pub fn click_zoom_picker(ui: &mut egui::Ui, cx: &mut AppCx) {
         .width(60.0)
         .show_ui(ui, |ui| {
             for z in [
+                ClickZoom::OneToOne,
                 ClickZoom::TwoToOne,
                 ClickZoom::ThreeToOne,
                 ClickZoom::FiveToOne,
-                ClickZoom::OneToOne,
                 ClickZoom::Off,
             ] {
                 ui.selectable_value(&mut cx.settings.click_zoom, z, name(z));
