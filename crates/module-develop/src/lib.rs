@@ -346,6 +346,14 @@ impl DevelopModule {
             received: 0,
         };
         match (&cx.gpu, info) {
+            // A missing original is not a decode failure: say so, and leave
+            // the photo's edits untouched. Locate… (in the Library) relinks it.
+            (Some(_), Some(info)) if !info.path.exists() => {
+                doc.error = Some(
+                    "The original is missing from disk, so it can't be edited or exported.\nUse Locate… in the Library to find it."
+                        .into(),
+                );
+            }
             (Some(gpu), Some(info)) => {
                 doc.loading = Some(open_in_background(&cx.jobs, gpu.clone(), photo, info));
             }
@@ -606,6 +614,9 @@ impl DevelopModule {
         match cx.apply_command_event(Box::new(CreateVirtualCopies::new(vec![photo]))) {
             Ok(Some(viberoom_core::events::CatalogEvent::PhotosAdded { ids, .. })) => {
                 if let Some(&copy) = ids.first() {
+                    if let Some(previews) = &cx.previews {
+                        viberoom_services::preview::copy_previews(previews, &[(photo, copy)]);
+                    }
                     cx.selection.select_single(copy);
                 }
             }

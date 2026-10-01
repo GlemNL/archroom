@@ -16,6 +16,8 @@ pub struct FilterState {
     pub flag: Option<FlagValue>,
     pub label: Option<String>,
     pub edited: Option<bool>,
+    /// Show only photos whose original is missing from disk.
+    pub missing: bool,
     pub camera: String,
 }
 
@@ -47,6 +49,9 @@ impl FilterState {
         }
         if let Some(edited) = self.edited {
             rules.push(Rule::Edited { edited });
+        }
+        if self.missing {
+            rules.push(Rule::Missing { missing: true });
         }
         if !self.camera.trim().is_empty() {
             rules.push(Rule::Camera {
@@ -114,6 +119,8 @@ pub fn show(ui: &mut egui::Ui, filter: &mut FilterState, shown: usize) -> bool {
                 ui.selectable_value(&mut filter.edited, Some(true), "Edited");
                 ui.selectable_value(&mut filter.edited, Some(false), "Unedited");
             });
+        ui.toggle_value(&mut filter.missing, "⚠ Missing")
+            .on_hover_text("Only photos whose original is missing from disk");
         ui.add(
             egui::TextEdit::singleline(&mut filter.camera)
                 .hint_text("Camera model")
@@ -201,6 +208,7 @@ fn default_rules() -> Vec<(&'static str, Rule)> {
         ),
         ("Edited", Rule::Edited { edited: true }),
         ("Virtual copy", Rule::VirtualCopy { is_copy: true }),
+        ("Missing", Rule::Missing { missing: true }),
         ("Capture year", Rule::CaptureYear { year: 2024 }),
         (
             "Camera",
@@ -266,6 +274,11 @@ fn rule_row(ui: &mut egui::Ui, index: usize, rule: &mut Rule) -> bool {
             ui.label("Photo is");
             ui.selectable_value(is_copy, true, "a virtual copy");
             ui.selectable_value(is_copy, false, "a master");
+        }
+        Rule::Missing { missing } => {
+            ui.label("Original is");
+            ui.selectable_value(missing, true, "missing");
+            ui.selectable_value(missing, false, "present");
         }
         Rule::CaptureYear { year } => {
             ui.label("Captured in");

@@ -2,9 +2,12 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use viberoom_catalog::Catalog;
+use viberoom_catalog::command::{Command as CatalogCommand, Removal, RemovePhotos};
+use viberoom_catalog::{Catalog, repo};
 use viberoom_color::icc::OutputSpace;
+use viberoom_core::ids::PhotoId;
 use viberoom_services::import::{ImportMode, ImportOptions, ImportProgressSink, run_import};
+use viberoom_services::library::{self, TrashPhotos};
 
 /// `viberoom-cli`: the headless entry point into the engine, catalog and
 /// services crates (plan §4.1) — used for tests, batch jobs and benchmarks,
@@ -114,6 +117,35 @@ enum CatalogAction {
     Check { path: PathBuf },
     /// Copy the catalog to `dest` via the SQLite online-backup API.
     Backup { path: PathBuf, dest: PathBuf },
+    /// List the photos (id, flag, path); `--missing` shows only missing ones.
+    List {
+        path: PathBuf,
+        #[arg(long)]
+        missing: bool,
+    },
+    /// `stat` the originals and flag the ones gone from disk (and clear the
+    /// flag on ones that came back). Only the catalog's `missing` flag changes.
+    CheckMissing { path: PathBuf },
+    /// Remove photos from the catalog. Files on disk are never touched.
+    /// Without `--yes` this only prints what it would do.
+    Remove {
+        path: PathBuf,
+        /// Photo ids (see `catalog list`).
+        #[arg(required = true)]
+        ids: Vec<i64>,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Move photos' original files (and sidecars) to the freedesktop trash,
+    /// then remove them from the catalog. Never deletes permanently.
+    /// Without `--yes` this only prints the plan.
+    Trash {
+        path: PathBuf,
+        #[arg(required = true)]
+        ids: Vec<i64>,
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -134,6 +166,78 @@ fn main() -> Result<()> {
                 let catalog = Catalog::create_or_open(&path)?;
                 catalog.backup_to(&dest)?;
                 println!("backed up {} -> {}", path.display(), dest.display());
+            }
+            CatalogAction::List { path, missing } => {
+                let catalog = Catalog::create_or_open(&path)?;
+                let conn = catalog.connection();
+                let folders: std::collections::HashMap<_, _> = repo::list_folders(conn)?
+                    .into_iter()
+                    .map(|f| (f.id, f.path))
+                    .collect();
+                for p in repo::list_all_photos(conn, repo::PhotoSort::ImportOrder)? {
+                    if missing && !p.missing {
+                        continue;
+                    }
+                    let dir = folders.get(&p.folder_id).map_or("?", String::as_str);
+                    println!(
+                        "{}\t{}\t{}/{}",
+                        p.photo_id.get(),
+                        if p.missing { "MISSING" } else { "ok" },
+                        dir,
+                        p.filename
+                    );
+                }
+            }
+            CatalogAction::CheckMissing { path } => {
+                let catalog = Catalog::create_or_open(&path)?;
+                let report = library::check_missing(
+                    catalog.connection(),
+                    library::MissingScope::All,
+                    &|| false,
+                )?;
+                println!(
+                    "checked {}: {} newly missing, {} found again",
+                    report.checked,
+                    report.now_missing.len(),
+                    report.restored.len()
+                );
+            }
+            CatalogAction::Remove { path, ids, yes } => {
+                let catalog = Catalog::create_or_open(&path)?;
+                let ids: Vec<PhotoId> = ids.into_iter().map(PhotoId::new).collect();
+                println!(
+                    "{} {} photo(s) from the catalog; files on disk are not touched",
+                    if yes { "removing" } else { "would remove" },
+                    ids.len()
+                );
+                if yes {
+                    RemovePhotos::new(ids, Removal::Catalog).apply(catalog.connection())?;
+                    println!("done (the rows are purged for good the next time the app starts)");
+                } else {
+                    println!("dry run: pass --yes to do it");
+                }
+            }
+            CatalogAction::Trash { path, ids, yes } => {
+                let catalog = Catalog::create_or_open(&path)?;
+                let ids: Vec<PhotoId> = ids.into_iter().map(PhotoId::new).collect();
+                let plan = library::plan_trash(catalog.connection(), &ids)?;
+                for f in &plan.files {
+                    println!("  trash: {}", f.display());
+                }
+                println!(
+                    "{} photo(s); {} file(s) to trash, {} kept (shared with another photo), {} already missing",
+                    ids.len(),
+                    plan.files.len(),
+                    plan.kept_shared,
+                    plan.already_missing
+                );
+                if yes {
+                    TrashPhotos::new(plan, Box::new(library::SystemTrash))
+                        .apply(catalog.connection())?;
+                    println!("done; restore the files from your file manager's trash if needed");
+                } else {
+                    println!("dry run: pass --yes to do it");
+                }
             }
         },
         Command::Export {

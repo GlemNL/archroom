@@ -72,6 +72,16 @@ fn show_thumb(ui: &mut egui::Ui, cx: &mut AppCx, photo: &PhotoSummary) {
         }
     }
 
+    if photo.missing {
+        painter.text(
+            rect.right_top() + egui::vec2(-3.0, 2.0),
+            egui::Align2::RIGHT_TOP,
+            "⚠",
+            egui::FontId::proportional(12.0),
+            egui::Color32::from_rgb(0xe5, 0xa0, 0x35),
+        );
+    }
+
     if is_active {
         painter.rect_stroke(
             rect,

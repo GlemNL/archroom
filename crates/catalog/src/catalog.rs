@@ -41,6 +41,18 @@ impl Catalog {
         Ok(Self { conn, path })
     }
 
+    /// Makes photos removed in an earlier session final (catalog rows only;
+    /// files on disk are never touched). The app calls this once at start-up,
+    /// *not* from `create_or_open`: background jobs reopen the catalog
+    /// mid-session and must not purge photos whose removal is still undoable.
+    pub fn purge_removed(&self) -> Result<usize> {
+        let purged = crate::repo::purge_removed(&self.conn)?;
+        if purged > 0 {
+            info!(purged, "purged removed photos");
+        }
+        Ok(purged)
+    }
+
     pub fn path(&self) -> &Path {
         &self.path
     }

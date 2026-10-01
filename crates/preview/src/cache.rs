@@ -182,6 +182,33 @@ impl PreviewCache {
         Ok(freed)
     }
 
+    /// Gives `dst` its own copy of `src`'s preview at `level` (same pixels,
+    /// same params hash). Virtual copies start as the same picture as their
+    /// master, but previews are keyed by photo id, so they would otherwise
+    /// stay blank until rendered. Returns false when there was nothing to copy
+    /// or `dst` already has one.
+    pub fn copy_entry(&self, src: PhotoId, dst: PhotoId, level: &str) -> Result<bool> {
+        if self.lookup(dst, level)?.is_some() {
+            return Ok(false);
+        }
+        let row: Option<(i64, u32, u32)> = self
+            .conn
+            .query_row(
+                "SELECT params_hash, width, height FROM previews WHERE photo_id = ?1 AND level = ?2",
+                params![src.get(), level],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .optional()?;
+        let (Some((hash, w, h)), Some(path)) = (row, self.lookup(src, level)?) else {
+            return Ok(false);
+        };
+        let Ok(bytes) = std::fs::read(&path) else {
+            return Ok(false);
+        };
+        self.store(dst, level, hash, &bytes, w, h)?;
+        Ok(true)
+    }
+
     pub fn lookup(&self, photo_id: PhotoId, level: &str) -> Result<Option<PathBuf>> {
         let filename: Option<String> = self
             .conn
@@ -276,5 +303,28 @@ mod tests {
             .unwrap();
 
         assert_eq!(std::fs::read(&path).unwrap(), b"new");
+    }
+
+    #[test]
+    fn copy_entry_duplicates_a_preview_for_another_photo() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = PreviewCache::open_at(dir.path()).unwrap();
+        let (a, b) = (PhotoId::new(1), PhotoId::new(2));
+        assert!(
+            !cache.copy_entry(a, b, LEVEL_L1).unwrap(),
+            "nothing to copy yet"
+        );
+        cache.store(a, LEVEL_L1, 7, b"jpeg", 10, 20).unwrap();
+        assert!(cache.copy_entry(a, b, LEVEL_L1).unwrap());
+        let (pa, pb) = (
+            cache.lookup(a, LEVEL_L1).unwrap().unwrap(),
+            cache.lookup(b, LEVEL_L1).unwrap().unwrap(),
+        );
+        assert_ne!(
+            pa, pb,
+            "its own file, so trimming one never breaks the other"
+        );
+        assert_eq!(std::fs::read(pb).unwrap(), b"jpeg");
+        assert!(!cache.copy_entry(a, b, LEVEL_L1).unwrap(), "already there");
     }
 }

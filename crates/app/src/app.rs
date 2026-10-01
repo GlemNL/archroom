@@ -84,6 +84,20 @@ fn finish_open(
     if let Err(e) = cx.settings.save() {
         error!(error = %e, "failed to save settings");
     }
+    if take_backup {
+        // Photos removed last session are final now (rows only, never files).
+        if let Err(e) = catalog.purge_removed() {
+            error!(error = %e, "failed to purge removed photos");
+        }
+    }
+    if let Some(previews) = &cx.previews
+        && let Err(e) = viberoom_services::preview::backfill_virtual_copy_previews(
+            catalog.connection(),
+            previews,
+        )
+    {
+        error!(error = %e, "failed to backfill virtual copy previews");
+    }
     cx.catalog = Some(catalog);
 
     let (tx, rx) = crossbeam_channel::unbounded();

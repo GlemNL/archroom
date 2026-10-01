@@ -21,7 +21,7 @@ use crate::error::Result;
 /// `IMG_0001.xmp` next to the image, or the full-extension fallback when
 /// another catalogued file in the same folder shares the basename (a
 /// RAW+JPEG pair) and the plain name would collide (plan D5).
-fn sidecar_path_for(snap: &repo::PhotoXmpSnapshot) -> PathBuf {
+pub(crate) fn sidecar_path_for(snap: &repo::PhotoXmpSnapshot) -> PathBuf {
     if snap.same_stem_sibling {
         xmp::sidecar_path_with_full_extension(&snap.image_path)
     } else {

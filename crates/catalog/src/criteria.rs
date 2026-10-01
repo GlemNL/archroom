@@ -80,6 +80,10 @@ pub enum Rule {
     VirtualCopy {
         is_copy: bool,
     },
+    /// The original is (or is not) flagged missing on disk.
+    Missing {
+        missing: bool,
+    },
     CaptureYear {
         year: u16,
     },
@@ -170,6 +174,7 @@ pub fn registry() -> Vec<Box<dyn Criterion>> {
         Box::new(LabelCriterion),
         Box::new(EditedCriterion),
         Box::new(VirtualCopyCriterion),
+        Box::new(MissingCriterion),
         Box::new(CaptureDateCriterion),
         Box::new(CameraCriterion),
         Box::new(LensCriterion),
@@ -409,6 +414,43 @@ impl Criterion for VirtualCopyCriterion {
         (
             format!("(p.copy_name IS NOT NULL) = ?{base}"),
             vec![Value::from(is_copy)],
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct MissingCriterion;
+impl Criterion for MissingCriterion {
+    fn id(&self) -> CriterionId {
+        CriterionId("missing")
+    }
+
+    fn label(&self) -> &str {
+        "Missing"
+    }
+
+    fn applies(&self, rule: &Rule) -> bool {
+        matches!(rule, Rule::Missing { .. })
+    }
+
+    fn describe(&self, rule: &Rule) -> String {
+        let Rule::Missing { missing } = *rule else {
+            return String::new();
+        };
+        if missing {
+            "Original is missing".to_string()
+        } else {
+            "Original is present".to_string()
+        }
+    }
+
+    fn sql(&self, rule: &Rule, base: i32) -> (String, Vec<Value>) {
+        let Rule::Missing { missing } = *rule else {
+            return (String::new(), Vec::new());
+        };
+        (
+            format!("(f.missing != 0) = ?{base}"),
+            vec![Value::from(missing)],
         )
     }
 }

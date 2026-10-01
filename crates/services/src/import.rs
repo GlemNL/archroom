@@ -258,7 +258,7 @@ fn import_one(
     Ok(ImportOutcome::Imported(photo_id))
 }
 
-fn quick_hash_of(path: &Path) -> Result<Vec<u8>> {
+pub(crate) fn quick_hash_of(path: &Path) -> Result<Vec<u8>> {
     use std::io::Read;
     let mut file = std::fs::File::open(path).map_err(|e| crate::error::Error::io(path, e))?;
     let mut buf = vec![0u8; 64 * 1024];
