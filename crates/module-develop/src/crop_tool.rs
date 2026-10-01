@@ -629,8 +629,12 @@ impl CropTool {
         }
 
         let mut out = None;
+        // Hit-test where the button went down: by the time egui reports the
+        // drag the pointer has already travelled past its drag threshold.
         if resp.drag_started()
-            && let Some(pos) = resp.interact_pointer_pos()
+            && let Some(pos) = ui
+                .input(|i| i.pointer.press_origin())
+                .or(resp.interact_pointer_pos())
         {
             self.drag = Some(if self.level {
                 Drag::Level { from: pos }
