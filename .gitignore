@@ -12,3 +12,6 @@
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Local planning documents (never committed).
+/plans/
