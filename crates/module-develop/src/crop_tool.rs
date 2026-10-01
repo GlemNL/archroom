@@ -108,6 +108,8 @@ pub struct CropTool {
     drag: Option<Drag>,
     level: bool,
     level_line: Option<(Pos2, Pos2)>,
+    /// A double click inside the box: apply the crop and close the tool.
+    close_requested: bool,
     /// Aspect lock as width:height; `[0, 0]` is free.
     aspect: [f64; 2],
     custom: [f64; 2],
@@ -242,6 +244,7 @@ impl CropTool {
             drag: None,
             level: false,
             level_line: None,
+            close_requested: false,
             aspect: params.get::<Crop>().aspect,
             custom: [4.0, 3.0],
         }
@@ -727,6 +730,14 @@ impl CropTool {
             }
         }
         if resp.double_clicked()
+            && !self.level
+            && let Some(pos) = resp.interact_pointer_pos()
+            && crop_rect.contains(pos)
+            && self.hit(img, rect, pos).is_none()
+        {
+            self.close_requested = true;
+        }
+        if resp.double_clicked()
             && let Some(pos) = resp.interact_pointer_pos()
             && in_rotate_zone(crop_rect, pos)
             && angle != 0.0
@@ -766,6 +777,10 @@ impl CropTool {
 impl CanvasTool for CropTool {
     fn id(&self) -> ToolId {
         ToolId::Crop
+    }
+
+    fn take_close_request(&mut self) -> bool {
+        std::mem::take(&mut self.close_requested)
     }
 
     fn ignore_crop(&self) -> bool {

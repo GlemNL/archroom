@@ -113,6 +113,12 @@ pub trait CanvasTool: std::fmt::Debug {
         geom: &Geometry,
     ) -> (Option<Outcome>, ToolAction);
 
+    /// The canvas asked to apply and close the tool (e.g. a double click);
+    /// reading it clears the request.
+    fn take_close_request(&mut self) -> bool {
+        false
+    }
+
     /// Tool-specific keys: `O`, `X`, `'`, `[`, `]`.
     fn on_key(
         &mut self,

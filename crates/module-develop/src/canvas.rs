@@ -482,6 +482,10 @@ pub fn show(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
         m.apply_outcome(cx, o);
         return;
     }
+    if m.tool.as_mut().is_some_and(|t| t.take_close_request()) {
+        m.close_tool(cx, true);
+        return;
+    }
     if let Some((temp, tint)) = picked {
         let mut params = doc.params.clone();
         params.set::<WhiteBalance>(WhiteBalanceParams {
