@@ -92,6 +92,10 @@ pub enum Slot {
     Tex2d {
         filterable: bool,
     },
+    /// A sampled 2D float texture array (one layer per brush zone).
+    Tex2dArray {
+        filterable: bool,
+    },
     Tex3d,
     Sampler,
     /// Write-only storage texture of the given format.
@@ -127,6 +131,11 @@ impl Kernel {
                     Slot::Tex2d { filterable } => wgpu::BindingType::Texture {
                         sample_type: wgpu::TextureSampleType::Float { filterable },
                         view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    Slot::Tex2dArray { filterable } => wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable },
+                        view_dimension: wgpu::TextureViewDimension::D2Array,
                         multisampled: false,
                     },
                     Slot::Tex3d => wgpu::BindingType::Texture {

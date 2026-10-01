@@ -18,6 +18,7 @@ pub enum Mode {
 /// Per-photo groups (crop, straighten) start unchecked unless edited.
 pub fn group_list(registry: &Registry, params: &EditParams) -> Vec<(SettingsGroup, bool)> {
     let mut groups: Vec<SettingsGroup> = registry.iter().map(|o| o.group()).collect();
+    groups.push(SettingsGroup::LocalAdjustments);
     groups.sort();
     groups.dedup();
     let edited: Vec<SettingsGroup> = registry
@@ -25,9 +26,15 @@ pub fn group_list(registry: &Registry, params: &EditParams) -> Vec<(SettingsGrou
         .filter(|o| params.ops.contains_key(o.id()))
         .map(|o| o.group())
         .collect();
+    // Circles and masks belong to one photo: never pre-checked.
     groups
         .into_iter()
-        .map(|g| (g, edited.is_empty() || edited.contains(&g)))
+        .map(|g| {
+            (
+                g,
+                !g.is_photo_specific() && (edited.is_empty() || edited.contains(&g)),
+            )
+        })
         .collect()
 }
 

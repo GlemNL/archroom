@@ -12,7 +12,10 @@ use viberoom_services::engine::geometry::{
 };
 use viberoom_services::engine::ops::{Crop, Straighten, StraightenParams};
 
-use crate::basic::{Change, spec_slider};
+use viberoom_services::engine::geometry::Geometry;
+
+use crate::basic::spec_slider;
+use crate::tool::{CanvasTool, Outcome, ToolAction, ToolId};
 
 const HANDLE: f32 = 9.0;
 const OVERLAYS: [&str; 4] = ["Rule of Thirds", "Grid", "Golden Ratio", "None"];
@@ -40,16 +43,63 @@ enum Handle {
 
 #[derive(Debug, Clone, Copy)]
 enum Drag {
-    Move { start: [f64; 4], grab: [f64; 2] },
-    Resize { handle: Handle, start: [f64; 4] },
-    Level { from: Pos2 },
+    Move {
+        start: [f64; 4],
+        grab: [f64; 2],
+    },
+    Resize {
+        handle: Handle,
+        start: [f64; 4],
+    },
+    Level {
+        from: Pos2,
+    },
+    /// The image turns under the upright box as the pointer sweeps around
+    /// the box's centre (plan v0.2.0 §4.5).
+    Rotate {
+        start_rect: [f64; 4],
+        start_angle: f64,
+        start_pointer: f32,
+    },
 }
 
-/// A parameter change produced by the tool.
-#[derive(Debug)]
-pub struct Outcome {
-    pub params: EditParams,
-    pub change: Change,
+/// How far out from a corner (screen px) the rotate zone reaches.
+const ROTATE_REACH: f32 = 40.0;
+/// Below this angle (degrees) a rotation snaps to level.
+const LEVEL_SNAP: f64 = 0.3;
+
+/// The angle of `pos` around `center`, in degrees (y down, clockwise).
+fn pointer_angle(center: Pos2, pos: Pos2) -> f32 {
+    (pos.y - center.y).atan2(pos.x - center.x).to_degrees()
+}
+
+/// The straighten angle and crop box for a rotate drag: the image turns by
+/// the angle the pointer swept (clockwise = clockwise), Shift snaps to whole
+/// degrees, and the box shrinks about its centre to stay inside the image,
+/// always measured from the box as the drag began so it grows back when the
+/// angle returns toward 0.
+pub fn rotate_drag(
+    start_angle: f64,
+    start_rect: [f64; 4],
+    canvas: (u32, u32),
+    start_pointer: f32,
+    pointer: f32,
+    snap_whole: bool,
+) -> (f64, [f64; 4]) {
+    let mut sweep = f64::from(pointer - start_pointer);
+    if sweep > 180.0 {
+        sweep -= 360.0;
+    } else if sweep < -180.0 {
+        sweep += 360.0;
+    }
+    let mut angle = (start_angle + sweep).clamp(-45.0, 45.0);
+    if snap_whole {
+        angle = angle.round();
+    }
+    if angle.abs() < LEVEL_SNAP {
+        angle = 0.0;
+    }
+    (angle, fit_rect(angle, canvas, start_rect))
 }
 
 #[derive(Debug)]
@@ -143,6 +193,19 @@ fn resize(handle: Handle, start: [f64; 4], p: [f64; 2], ratio: Option<f64>) -> [
     sanitize(r)
 }
 
+/// Just outside a corner of the crop box (the rotate zone).
+fn in_rotate_zone(crop_rect: Rect, pos: Pos2) -> bool {
+    !crop_rect.contains(pos)
+        && [
+            crop_rect.left_top(),
+            crop_rect.right_top(),
+            crop_rect.left_bottom(),
+            crop_rect.right_bottom(),
+        ]
+        .iter()
+        .any(|c| c.distance(pos) <= ROTATE_REACH)
+}
+
 fn handle_cursor(h: Handle) -> CursorIcon {
     match h {
         Handle::Tl | Handle::Br => CursorIcon::ResizeNwSe,
@@ -189,13 +252,7 @@ impl CropTool {
     }
 
     fn outcome(label: &str, params: EditParams, immediate: bool) -> Option<Outcome> {
-        Some(Outcome {
-            params,
-            change: Change {
-                label: label.to_string(),
-                immediate,
-            },
-        })
+        Outcome::new(label, params, immediate)
     }
 
     /// Locks (or frees) the aspect and fits the current rectangle to it.
@@ -220,7 +277,7 @@ impl CropTool {
     }
 
     /// `X`: swaps a portrait crop for a landscape one (and back).
-    pub fn swap_orientation(&mut self, params: &EditParams, canvas: (u32, u32)) -> Option<Outcome> {
+    fn swap_orientation(&mut self, params: &EditParams, canvas: (u32, u32)) -> Option<Outcome> {
         let crop = params.get::<Crop>();
         let [x0, y0, x1, y1] = crop.rect();
         let (cx, cy) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
@@ -291,7 +348,7 @@ impl CropTool {
 
     /// The options block (right panel). Returns a change and whether the
     /// user pressed Done.
-    pub fn options(
+    fn crop_options(
         &mut self,
         ui: &mut egui::Ui,
         params: &EditParams,
@@ -446,7 +503,7 @@ impl CropTool {
 
     /// Draws the overlay over the canvas image at `img` and handles the
     /// pointer. `canvas` is the canvas size in pixels.
-    pub fn canvas(
+    fn crop_canvas(
         &mut self,
         ui: &egui::Ui,
         img: Rect,
@@ -497,7 +554,8 @@ impl CropTool {
 
         // Composition overlay.
         let line = Stroke::new(1.0_f32, Color32::from_white_alpha(110));
-        let fractions: &[f32] = match self.overlay {
+        let rotating = matches!(self.drag, Some(Drag::Rotate { .. }));
+        let fractions: &[f32] = match if rotating { 1 } else { self.overlay } {
             0 => &[1.0 / 3.0, 2.0 / 3.0],
             1 => &[1.0 / 6.0, 2.0 / 6.0, 3.0 / 6.0, 4.0 / 6.0, 5.0 / 6.0],
             2 => &[0.381_966, 0.618_034],
@@ -562,7 +620,12 @@ impl CropTool {
                 ui.ctx().set_cursor_icon(handle_cursor(h));
             } else if crop_rect.contains(pos) {
                 ui.ctx().set_cursor_icon(CursorIcon::Move);
+            } else if in_rotate_zone(crop_rect, pos) {
+                ui.ctx().set_cursor_icon(CursorIcon::Grab);
             }
+        }
+        if matches!(self.drag, Some(Drag::Rotate { .. })) {
+            ui.ctx().set_cursor_icon(CursorIcon::Grabbing);
         }
 
         let mut out = None;
@@ -581,6 +644,12 @@ impl CropTool {
                     start: rect,
                     grab: to_norm(img, pos),
                 }
+            } else if in_rotate_zone(crop_rect, pos) {
+                Drag::Rotate {
+                    start_rect: rect,
+                    start_angle: angle,
+                    start_pointer: pointer_angle(crop_rect.center(), pos),
+                }
             } else {
                 // Dragging outside starts a new crop from that point.
                 let p = to_norm(img, pos);
@@ -595,6 +664,35 @@ impl CropTool {
         {
             match drag {
                 Drag::Level { from } => self.level_line = Some((from, pos)),
+                Drag::Rotate {
+                    start_rect,
+                    start_angle,
+                    start_pointer,
+                } => {
+                    let shift = ui.input(|i| i.modifiers.shift);
+                    let (new_angle, new_rect) = rotate_drag(
+                        start_angle,
+                        start_rect,
+                        canvas,
+                        start_pointer,
+                        pointer_angle(crop_rect.center(), pos),
+                        shift,
+                    );
+                    painter.text(
+                        pos + egui::vec2(16.0, -16.0),
+                        egui::Align2::LEFT_BOTTOM,
+                        format!("{new_angle:+.1}°"),
+                        egui::FontId::proportional(14.0),
+                        Color32::WHITE,
+                    );
+                    if new_angle != angle || new_rect != rect {
+                        out = Self::outcome(
+                            "Rotate Crop",
+                            with_geometry(params, Some(new_rect), Some(new_angle), self.aspect),
+                            false,
+                        );
+                    }
+                }
                 Drag::Move { start, grab } => {
                     let now = to_norm(img, pos);
                     let (dx, dy) = (now[0] - grab[0], now[1] - grab[1]);
@@ -624,6 +722,18 @@ impl CropTool {
                 }
             }
         }
+        if resp.double_clicked()
+            && let Some(pos) = resp.interact_pointer_pos()
+            && in_rotate_zone(crop_rect, pos)
+            && angle != 0.0
+        {
+            let rect = fit_rect(0.0, canvas, crop.rect());
+            out = Self::outcome(
+                "Rotate Crop",
+                with_geometry(params, Some(rect), Some(0.0), self.aspect),
+                true,
+            );
+        }
         if resp.drag_stopped() {
             if let Some(Drag::Level { from }) = self.drag
                 && let Some(to) = resp.interact_pointer_pos()
@@ -646,6 +756,65 @@ impl CropTool {
             self.drag = None;
         }
         out
+    }
+}
+
+impl CanvasTool for CropTool {
+    fn id(&self) -> ToolId {
+        ToolId::Crop
+    }
+
+    fn ignore_crop(&self) -> bool {
+        true
+    }
+
+    fn canvas(
+        &mut self,
+        ui: &egui::Ui,
+        img: Rect,
+        resp: &egui::Response,
+        geom: &Geometry,
+        params: &EditParams,
+    ) -> Option<Outcome> {
+        self.crop_canvas(ui, img, resp, params, geom.canvas)
+    }
+
+    fn options(
+        &mut self,
+        ui: &mut egui::Ui,
+        params: &EditParams,
+        geom: &Geometry,
+    ) -> (Option<Outcome>, ToolAction) {
+        let (out, done) = self.crop_options(ui, params, geom.canvas);
+        (
+            out,
+            if done {
+                ToolAction::Apply
+            } else {
+                ToolAction::None
+            },
+        )
+    }
+
+    fn on_key(
+        &mut self,
+        key: egui::Key,
+        _shift: bool,
+        params: &EditParams,
+        geom: &Geometry,
+    ) -> Option<Outcome> {
+        match key {
+            egui::Key::O => {
+                self.cycle_overlay();
+                None
+            }
+            egui::Key::X => self.swap_orientation(params, geom.canvas),
+            _ => None,
+        }
+    }
+
+    fn finish(&mut self, _apply: bool, _doc: &EditParams) -> Option<Outcome> {
+        None
     }
 }
 
@@ -701,5 +870,29 @@ mod tests {
         });
         let out = tool.rotate(&flipped, true).unwrap();
         assert_eq!(out.params.get::<Crop>().quarters, 3);
+    }
+
+    #[test]
+    fn a_rotate_drag_turns_the_image_with_the_pointer_and_keeps_the_box_inside() {
+        let canvas = (300, 200);
+        let full = [0.0, 0.0, 1.0, 1.0];
+        // Pointer sweeps 10° clockwise: the angle follows, the box shrinks.
+        let (a, r) = rotate_drag(0.0, full, canvas, 30.0, 40.0, false);
+        assert!((a - 10.0).abs() < 1e-6);
+        assert!(viberoom_services::engine::geometry::rect_inside(
+            a, canvas, r
+        ));
+        assert!(r[2] - r[0] < 0.95);
+        // Coming back to 0 gives the full box back (measured from the start).
+        let (a, r) = rotate_drag(0.0, full, canvas, 30.0, 30.1, false);
+        assert_eq!((a, r), (0.0, full), "light snap at level");
+        // Shift snaps to whole degrees; the angle is clamped to ±45°.
+        let (a, _) = rotate_drag(0.0, full, canvas, 0.0, 7.4, true);
+        assert_eq!(a, 7.0);
+        let (a, _) = rotate_drag(40.0, full, canvas, 0.0, 30.0, false);
+        assert_eq!(a, 45.0);
+        // Crossing ±180° on the pointer circle doesn't jump.
+        let (a, _) = rotate_drag(0.0, full, canvas, 175.0, -175.0, false);
+        assert!((a - 10.0).abs() < 1e-6);
     }
 }

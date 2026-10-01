@@ -10,6 +10,7 @@ use viberoom_shell::AppCx;
 
 use crate::basic::Change;
 use crate::copy_dialog::{CopyDialog, Mode};
+use crate::tool::ToolId;
 use crate::{DevelopModule, Zoom};
 
 /// How long the Fit/1:1/2:1 transition takes, in seconds.
@@ -45,16 +46,22 @@ pub fn toolbar(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
     }
     viberoom_shell::click_zoom_picker(ui, cx);
     ui.separator();
-    let mut tool_on = m.crop_tool.is_some();
-    if ui
-        .add_enabled(m.doc.is_some(), egui::Button::selectable(tool_on, "Crop"))
-        .on_hover_text("Crop & straighten (R)")
-        .clicked()
-    {
-        tool_on = !tool_on;
+    let open = m.tool.as_ref().map(|t| t.id());
+    let mut clicked = None;
+    for id in ToolId::ALL {
+        if ui
+            .add_enabled(
+                m.doc.is_some(),
+                egui::Button::selectable(open == Some(id), id.label()),
+            )
+            .on_hover_text(id.hint())
+            .clicked()
+        {
+            clicked = Some(id);
+        }
     }
-    if tool_on != m.crop_tool.is_some() {
-        m.toggle_crop_tool();
+    if let Some(id) = clicked {
+        m.open_tool(cx, id);
     }
     ui.separator();
     ui.toggle_value(&mut m.clip, "Clipping")
@@ -125,14 +132,44 @@ fn handle_keys(ctx: &egui::Context, m: &mut DevelopModule, cx: &mut AppCx) {
             i.consume_key(cmd | Modifiers::ALT, Key::V),
             i.consume_key(Modifiers::NONE, Key::ArrowLeft),
             i.consume_key(Modifiers::NONE, Key::ArrowRight),
+            i.consume_key(Modifiers::SHIFT, Key::R),
             i.consume_key(Modifiers::NONE, Key::R),
-            i.consume_key(Modifiers::NONE, Key::O),
-            i.consume_key(Modifiers::NONE, Key::X),
+            i.consume_key(Modifiers::NONE, Key::M),
+            i.consume_key(Modifiers::NONE, Key::K),
             i.consume_key(Modifiers::NONE, Key::Enter),
             i.consume_key(Modifiers::NONE, Key::Escape),
             i.consume_key(cmd, Key::N),
         ]
     });
+    // Keys only an open tool reacts to.
+    let tool_keys: Vec<(Key, bool)> = if m.tool.is_some() {
+        ctx.input_mut(|i| {
+            let mut found = Vec::new();
+            for (key, shift) in [
+                (Key::O, false),
+                (Key::X, false),
+                (Key::Quote, false),
+                (Key::OpenBracket, false),
+                (Key::CloseBracket, false),
+                (Key::OpenBracket, true),
+                (Key::CloseBracket, true),
+                (Key::Delete, false),
+                (Key::Backspace, false),
+            ] {
+                let mods = if shift {
+                    Modifiers::SHIFT
+                } else {
+                    Modifiers::NONE
+                };
+                if i.consume_key(mods, key) {
+                    found.push((key, shift));
+                }
+            }
+            found
+        })
+    } else {
+        Vec::new()
+    };
     let [
         j,
         w,
@@ -146,9 +183,10 @@ fn handle_keys(ctx: &egui::Context, m: &mut DevelopModule, cx: &mut AppCx) {
         prev,
         left,
         right,
+        shift_r,
         r,
-        o,
-        x,
+        m_key,
+        k_key,
         enter,
         esc,
         snapshot,
@@ -159,23 +197,30 @@ fn handle_keys(ctx: &egui::Context, m: &mut DevelopModule, cx: &mut AppCx) {
     if snapshot {
         m.add_snapshot(cx, "");
     }
-    if r || ((enter || esc) && m.crop_tool.is_some()) {
-        m.toggle_crop_tool();
+    for (id, pressed) in [
+        (ToolId::Crop, r),
+        (ToolId::RedEye, shift_r),
+        (ToolId::Gradient, m_key),
+        (ToolId::Brush, k_key),
+    ] {
+        if pressed {
+            m.open_tool(cx, id);
+        }
     }
-    if o && let Some(tool) = &mut m.crop_tool {
-        tool.cycle_overlay();
+    if m.tool.is_some() && (enter || esc) {
+        m.close_tool(cx, enter);
     }
-    if x && let (Some(tool), Some(doc)) = (&mut m.crop_tool, &m.doc)
-        && let Some(session) = &doc.session
+    if !tool_keys.is_empty()
+        && let (Some(geom), Some(doc)) = (m.tool_geometry(), &m.doc)
     {
-        let canvas = viberoom_services::engine::geometry::resolve(
-            session.source_size,
-            session.orientation,
-            &doc.params,
-            true,
-        )
-        .canvas;
-        if let Some(out) = tool.swap_orientation(&doc.params, canvas) {
+        let params = doc.params.clone();
+        let mut outs = Vec::new();
+        if let Some(tool) = &mut m.tool {
+            for (key, shift) in tool_keys {
+                outs.extend(tool.on_key(key, shift, &params, &geom));
+            }
+        }
+        for out in outs {
             m.apply_outcome(cx, out);
         }
     }
@@ -295,7 +340,7 @@ pub fn show(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
         session.source_size,
         session.orientation,
         &shown,
-        m.crop_tool.is_some(),
+        m.tool.as_ref().is_some_and(|t| t.ignore_crop()),
     );
     let (ow, oh) = geom.crop_px();
     let (ow, oh) = (ow as f32, oh as f32);
@@ -308,7 +353,7 @@ pub fn show(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
     };
     m.want_edge = ((size.max_elem() * ppp).ceil() as u32).clamp(256, 4096);
 
-    let tool_open = m.crop_tool.is_some();
+    let tool_open = m.tool.is_some();
     if resp.dragged() && m.zoom != Zoom::Fit && !m.eyedropper && !tool_open {
         m.pan += resp.drag_delta();
     }
@@ -400,8 +445,8 @@ pub fn show(ui: &mut egui::Ui, m: &mut DevelopModule, cx: &mut AppCx) {
 
     // Crop & straighten tool overlay.
     let mut crop_out = None;
-    if let Some(tool) = &mut m.crop_tool {
-        crop_out = tool.canvas(ui, img_rect, &resp, &doc.params, geom.canvas);
+    if let Some(tool) = &mut m.tool {
+        crop_out = tool.canvas(ui, img_rect, &resp, &geom, &doc.params);
     }
 
     // White-balance eyedropper.

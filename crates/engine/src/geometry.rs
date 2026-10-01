@@ -58,6 +58,74 @@ impl Geometry {
     }
 }
 
+impl Geometry {
+    /// The inverse of [`output_to_source`](Self::output_to_source): where a
+    /// source position (normalised, before orientation/straighten/crop)
+    /// lands in the rendered output (`u`, `v`; outside 0..1 when cropped
+    /// away). Everything placed on the image is stored in source
+    /// coordinates, so the canvas tools and the local-adjustment passes
+    /// go through this.
+    pub fn source_to_output(&self, x: f64, y: f64) -> [f64; 2] {
+        let (w, h) = (f64::from(self.canvas.0), f64::from(self.canvas.1));
+        // Orientation matrices are signed permutations: the inverse is the
+        // transpose.
+        let m = self.orientation.0;
+        let (dx, dy) = (x - 0.5, y - 0.5);
+        let ox = f64::from(m[0][0]) * dx + f64::from(m[1][0]) * dy + 0.5;
+        let oy = f64::from(m[0][1]) * dx + f64::from(m[1][1]) * dy + 0.5;
+        let (qx, qy) = rotate(ox * w - w / 2.0, oy * h - h / 2.0, self.angle_deg);
+        let (cx, cy) = ((qx + w / 2.0) / w, (qy + h / 2.0) / h);
+        [
+            (cx - self.crop[0]) / (self.crop[2] - self.crop[0]),
+            (cy - self.crop[1]) / (self.crop[3] - self.crop[1]),
+        ]
+    }
+
+    /// A vector in the source pixel frame as it points in the rendered
+    /// output (same length). Mirrored orientations flip handedness, so a
+    /// normal must be carried over with this, not rebuilt from an angle.
+    pub fn source_vector_to_output(&self, v: [f64; 2]) -> [f64; 2] {
+        let m = self.orientation.0;
+        let ox = f64::from(m[0][0]) * v[0] + f64::from(m[1][0]) * v[1];
+        let oy = f64::from(m[0][1]) * v[0] + f64::from(m[1][1]) * v[1];
+        let (qx, qy) = rotate(ox, oy, self.angle_deg);
+        [qx, qy]
+    }
+
+    /// The inverse of [`source_vector_to_output`](Self::source_vector_to_output).
+    pub fn output_vector_to_source(&self, v: [f64; 2]) -> [f64; 2] {
+        let (qx, qy) = rotate(v[0], v[1], -self.angle_deg);
+        let m = self.orientation.0;
+        [
+            f64::from(m[0][0]) * qx + f64::from(m[0][1]) * qy,
+            f64::from(m[1][0]) * qx + f64::from(m[1][1]) * qy,
+        ]
+    }
+
+    /// A direction in the source pixel frame (degrees, y down, 0° = +x) as
+    /// the angle it has in the rendered output.
+    pub fn source_angle_to_output(&self, deg: f64) -> f64 {
+        let (s, c) = deg.to_radians().sin_cos();
+        let [qx, qy] = self.source_vector_to_output([c, s]);
+        qy.atan2(qx).to_degrees()
+    }
+
+    /// The inverse of [`source_angle_to_output`](Self::source_angle_to_output).
+    pub fn output_angle_to_source(&self, deg: f64) -> f64 {
+        let (s, c) = deg.to_radians().sin_cos();
+        let (qx, qy) = rotate(c, s, -self.angle_deg);
+        let m = self.orientation.0;
+        let sx = f64::from(m[0][0]) * qx + f64::from(m[0][1]) * qy;
+        let sy = f64::from(m[1][0]) * qx + f64::from(m[1][1]) * qy;
+        sy.atan2(sx).to_degrees()
+    }
+
+    /// Output pixels per source pixel for an output `out_w` pixels wide.
+    pub fn output_scale(&self, out_w: u32) -> f64 {
+        f64::from(out_w) / self.crop_px().0
+    }
+}
+
 /// The Develop-side transform of `crop` applied on top of `base`.
 pub fn compose_orientation(base: Orientation, crop: &CropParams) -> Orientation {
     let mut o = base.rotated(crop.quarters);
@@ -365,5 +433,68 @@ mod tests {
         let v = (0.0, 1000.0);
         let angle = level_angle(0.0, a, (v.1 * 2f64.to_radians().tan(), v.1));
         assert!(angle.abs() < 3.0);
+    }
+
+    #[test]
+    fn source_and_output_positions_and_angles_round_trip() {
+        let crop = CropParams {
+            x0: 0.15,
+            y0: 0.2,
+            x1: 0.85,
+            y1: 0.9,
+            ..Default::default()
+        };
+        for tag in 1..=8 {
+            for flip in [false, true] {
+                for angle in [0.0, 7.5, -12.0, 45.0] {
+                    let crop = CropParams {
+                        flip_h: flip,
+                        ..crop.clone()
+                    };
+                    let p = params(angle, crop);
+                    let g = resolve((600, 400), Orientation::from_exif(tag), &p, false);
+                    for (u, v) in [(0.5, 0.5), (0.3, 0.6), (0.9, 0.2)] {
+                        let Some([sx, sy]) = g.output_to_source(u, v) else {
+                            continue;
+                        };
+                        let [bu, bv] = g.source_to_output(sx, sy);
+                        assert!(
+                            (bu - u).abs() < 1e-9 && (bv - v).abs() < 1e-9,
+                            "tag {tag} flip {flip} angle {angle}: ({u},{v}) -> ({bu},{bv})"
+                        );
+                    }
+                    let v = g.source_vector_to_output([0.3, -0.8]);
+                    let b = g.output_vector_to_source(v);
+                    assert!((b[0] - 0.3).abs() < 1e-9 && (b[1] + 0.8).abs() < 1e-9);
+                    for deg in [0.0, 30.0, -45.0, 90.0, 135.0] {
+                        let out = g.source_angle_to_output(deg);
+                        let back = g.output_angle_to_source(out);
+                        let d = (back - deg).rem_euclid(360.0);
+                        assert!(d < 1e-9 || d > 360.0 - 1e-9, "tag {tag}: {deg} -> {back}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn angles_follow_the_displayed_rotation() {
+        // EXIF 6 turns the picture a quarter clockwise: a source line
+        // pointing right now points down.
+        let g = resolve(
+            (600, 400),
+            Orientation::from_exif(6),
+            &EditParams::default(),
+            false,
+        );
+        assert!((g.source_angle_to_output(0.0) - 90.0).abs() < 1e-9);
+        // Straightening clockwise by 10° adds 10° to every direction.
+        let g = resolve(
+            (600, 400),
+            Orientation::IDENTITY,
+            &params(10.0, CropParams::default()),
+            false,
+        );
+        assert!((g.source_angle_to_output(20.0) - 30.0).abs() < 1e-9);
     }
 }

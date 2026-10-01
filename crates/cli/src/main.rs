@@ -57,6 +57,9 @@ enum Command {
         /// Draw the clipping overlay.
         #[arg(long)]
         clip: bool,
+        /// Tint the mask of the local adjustment with this id red.
+        #[arg(long)]
+        mask_overlay: Option<String>,
         /// Print the RGB/luma histogram peak bins and timings.
         #[arg(long)]
         stats: bool,
@@ -290,6 +293,7 @@ fn main() -> Result<()> {
             max_edge,
             no_orient,
             clip,
+            mask_overlay,
             stats,
         } => render(&RenderArgs {
             file,
@@ -299,6 +303,7 @@ fn main() -> Result<()> {
             max_edge,
             no_orient,
             clip,
+            mask_overlay,
             stats,
         })?,
     }
@@ -314,6 +319,7 @@ struct RenderArgs {
     max_edge: u32,
     no_orient: bool,
     clip: bool,
+    mask_overlay: Option<String>,
     stats: bool,
 }
 
@@ -396,6 +402,7 @@ fn render(a: &RenderArgs) -> Result<()> {
     let mut req = RenderRequest::new(edit.clone(), a.max_edge);
     req.orientation = orientation;
     req.clip_overlay = a.clip;
+    req.mask_overlay.clone_from(&a.mask_overlay);
     req.want_histogram = a.stats;
     let first = pipeline.render(&req)?;
     let (w, h, rgba) = pipeline.read_output_rgba8()?;

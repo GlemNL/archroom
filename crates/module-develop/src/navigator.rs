@@ -10,7 +10,7 @@ pub fn show(ui: &mut egui::Ui, m: &mut DevelopModule) {
             (Zoom::OneToOne, "1:1"),
             (Zoom::TwoToOne, "2:1"),
         ] {
-            if ui.selectable_label(m.zoom == z, name).clicked() && m.crop_tool.is_none() {
+            if ui.selectable_label(m.zoom == z, name).clicked() && m.tool.is_none() {
                 m.zoom = z;
                 m.pan = egui::Vec2::ZERO;
             }
@@ -60,7 +60,7 @@ pub fn show(ui: &mut egui::Ui, m: &mut DevelopModule) {
     );
 
     if m.zoom != Zoom::Fit
-        && m.crop_tool.is_none()
+        && m.tool.is_none()
         && (resp.clicked() || resp.dragged())
         && let Some(pos) = resp.interact_pointer_pos()
     {

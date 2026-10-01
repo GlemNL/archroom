@@ -40,6 +40,9 @@ pub fn groups_in(params: &EditParams) -> Vec<SettingsGroup> {
         .keys()
         .filter_map(|id| registry.get(id).map(|o| o.group()))
         .collect();
+    if !params.local.is_empty() {
+        groups.push(SettingsGroup::LocalAdjustments);
+    }
     groups.sort();
     groups.dedup();
     groups
@@ -49,15 +52,25 @@ pub fn groups_in(params: &EditParams) -> Vec<SettingsGroup> {
 /// applies.
 pub fn restrict(params: &EditParams, groups: &[SettingsGroup]) -> EditParams {
     let mut out = EditParams::default();
-    paste_groups(&mut out, params, groups);
+    paste_groups(&mut out, params, &portable(groups));
     out
+}
+
+/// `groups` without the ones tied to a specific photo (red eye circles and
+/// local masks): presets never carry them.
+fn portable(groups: &[SettingsGroup]) -> Vec<SettingsGroup> {
+    groups
+        .iter()
+        .copied()
+        .filter(|g| !g.is_photo_specific())
+        .collect()
 }
 
 impl Preset {
     /// Applies the preset to `target`: each of its groups is replaced by the
     /// preset's values (or reset when the preset leaves it at defaults).
     pub fn apply(&self, target: &mut EditParams) {
-        paste_groups(target, &self.params, &self.groups);
+        paste_groups(target, &self.params, &portable(&self.groups));
     }
 }
 

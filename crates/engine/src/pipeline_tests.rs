@@ -828,3 +828,463 @@ fn sixteen_bit_output_matches_eight_bit_and_space_changes_encoding() {
     let mid = ((8 * 16 + 8) * 4) as usize;
     assert_ne!(pp[mid + 1], d16[mid + 1]);
 }
+
+// --- v0.2.0: red eye and local adjustments --------------------------------
+
+use crate::geometry;
+use crate::local::{LinearMask, LocalAdjustment, LocalTone, MaskDef, Stroke};
+
+fn flat(w: u32, h: u32, v: [f32; 3]) -> DecodedImage {
+    raw(w, h, |_, _| v, camera(None))
+}
+
+fn disc(cx: f32, cy: f32, r: f32, x: u32, y: u32) -> bool {
+    ((x as f32 + 0.5 - cx).powi(2) + (y as f32 + 0.5 - cy).powi(2)).sqrt() <= r
+}
+
+fn gradient_adj(mask: LinearMask, tone: LocalTone) -> LocalAdjustment {
+    let mut a = LocalAdjustment::new("g1", "Gradient 1", MaskDef::Linear(mask));
+    a.adjust = tone;
+    a
+}
+
+fn exposure_tone(ev: f64) -> LocalTone {
+    LocalTone {
+        exposure: ev,
+        ..Default::default()
+    }
+}
+
+fn with_local(adjustments: &[LocalAdjustment]) -> EditParams {
+    let mut p = linear_profile();
+    p.set_local_adjustments(adjustments);
+    p
+}
+
+#[test]
+fn red_eye_neutralises_red_pixels_and_spares_skin_inside_the_circle() {
+    let Some(g) = gpu() else { return };
+    let (n, c) = (128u32, 64.0f32);
+    let img = raw(
+        n,
+        n,
+        |x, y| {
+            if disc(c, c, 8.0, x, y) {
+                [0.6, 0.04, 0.04] // flash red
+            } else if disc(c, c, 12.0, x, y) {
+                [0.75, 0.41, 0.30] // skin around the pupil
+            } else {
+                [0.2, 0.2, 0.2]
+            }
+        },
+        camera(None),
+    );
+    let mut pl = Pipeline::new(&g, &img).unwrap();
+    let before = render(&mut pl, linear_profile(), 128);
+
+    let diag = f64::from(n).hypot(f64::from(n));
+    let mut p = linear_profile();
+    p.set::<RedEye>(RedEyeParams {
+        spots: vec![EyeSpot {
+            x: 0.5,
+            y: 0.5,
+            r: 12.0 / diag,
+            ..Default::default()
+        }],
+    });
+    let stats = pl.render(&RenderRequest::new(p, 128)).unwrap();
+    assert!(stats.ran.red_eye);
+    let after = pl.read_output_rgba8().unwrap();
+
+    let pupil = px(&after, 64, 64);
+    assert!(
+        (pupil[0] - pupil[1]).abs() <= 3.0 && (pupil[2] - pupil[1]).abs() <= 3.0,
+        "neutral: {pupil:?}"
+    );
+    assert!(pupil[0] < enc(0.05), "dark: {pupil:?}");
+    assert!(px(&before, 64, 64)[0] > 200.0);
+    // Skin at radius ~10 and the field outside the circle are untouched.
+    for (x, y) in [(74, 64), (64, 54), (20, 20), (64 + 13, 64)] {
+        assert_eq!(px(&after, x, y), px(&before, x, y), "({x},{y}) changed");
+    }
+}
+
+#[test]
+fn pet_eye_darkens_any_bright_glow_but_not_a_darker_ring() {
+    let Some(g) = gpu() else { return };
+    let (n, y0) = (128u32, 64.0f32);
+    let (cl, cr) = (32.0f32, 96.0f32);
+    let img = raw(
+        n,
+        n,
+        |x, y| {
+            for (cx, glow) in [(cl, [0.1, 1.5, 0.2]), (cr, [1.5, 1.5, 1.4])] {
+                if disc(cx, y0, 8.0, x, y) {
+                    return glow;
+                }
+                if disc(cx, y0, 12.0, x, y) {
+                    return [0.02; 3]; // darker than the pupil target
+                }
+            }
+            [0.05; 3]
+        },
+        camera(None),
+    );
+    let mut pl = Pipeline::new(&g, &img).unwrap();
+    let before = render(&mut pl, linear_profile(), 128);
+    let diag = f64::from(n).hypot(f64::from(n));
+    let spot = |x: f64| EyeSpot {
+        x,
+        y: 0.5,
+        r: 12.0 / diag,
+        mode: EyeMode::Pet,
+        ..Default::default()
+    };
+    let mut p = linear_profile();
+    p.set::<RedEye>(RedEyeParams {
+        spots: vec![spot(0.25), spot(0.75)],
+    });
+    let after = render(&mut pl, p, 128);
+    for x in [32, 96] {
+        let c = px(&after, x, 64);
+        assert!(
+            (c[0] - c[1]).abs() <= 3.0 && (c[2] - c[1]).abs() <= 3.0 && c[1] < 80.0,
+            "x={x}: {c:?}"
+        );
+        assert!(px(&before, x, 64)[1] > 200.0);
+        // The ring (radius ~10) is darker than the target and stays.
+        assert_eq!(px(&after, x + 10, 64), px(&before, x + 10, 64));
+    }
+}
+
+#[test]
+fn the_catchlight_stays_upper_left_whatever_the_orientation() {
+    let Some(g) = gpu() else { return };
+    let img = flat(160, 120, [0.01; 3]);
+    let mut pl = Pipeline::new(&g, &img).unwrap();
+    let mut p = linear_profile();
+    p.set::<RedEye>(RedEyeParams {
+        spots: vec![EyeSpot {
+            r: 0.12,
+            mode: EyeMode::Pet,
+            catchlight: true,
+            ..Default::default()
+        }],
+    });
+    for tag in [1, 6, 3, 8] {
+        let mut req = RenderRequest::new(p.clone(), 160);
+        req.orientation = Orientation::from_exif(tag);
+        pl.render(&req).unwrap();
+        let out = pl.read_output_rgba8().unwrap();
+        let (mut sx, mut sy, mut n) = (0.0, 0.0, 0.0);
+        for y in 0..out.1 {
+            for x in 0..out.0 {
+                if px(&out, x, y)[0] > 120.0 {
+                    sx += x as f32;
+                    sy += y as f32;
+                    n += 1.0;
+                }
+            }
+        }
+        assert!(n > 4.0, "tag {tag}: no catchlight");
+        let (cx, cy) = (out.0 as f32 / 2.0, out.1 as f32 / 2.0);
+        assert!(
+            sx / n < cx - 1.0 && sy / n < cy - 1.0,
+            "tag {tag}: dot at ({}, {}), centre ({cx}, {cy})",
+            sx / n,
+            sy / n
+        );
+    }
+}
+
+#[test]
+fn a_linear_gradient_follows_the_photo_through_orientation_and_straighten() {
+    let Some(g) = gpu() else { return };
+    let (w, h) = (120u32, 80u32);
+    let mask = LinearMask {
+        x: 0.4,
+        y: 0.55,
+        angle: 20.0,
+        feather: 0.3,
+    };
+    let adj = gradient_adj(mask, exposure_tone(-1.0));
+    let mut pl = Pipeline::new(&g, &flat(w, h, [0.25; 3])).unwrap();
+    for (tag, straighten) in [
+        (1, 0.0),
+        (6, 0.0),
+        (3, 0.0),
+        (8, 0.0),
+        (2, 0.0),
+        (5, 0.0),
+        (7, 0.0),
+        (1, 10.0),
+        (6, -8.0),
+    ] {
+        let mut p = with_local(std::slice::from_ref(&adj));
+        p.set::<Straighten>(StraightenParams { angle: straighten });
+        let mut req = RenderRequest::new(p.clone(), 128);
+        req.orientation = Orientation::from_exif(tag);
+        pl.render(&req).unwrap();
+        let out = pl.read_output_rgba8().unwrap();
+        let geom = geometry::resolve((w, h), req.orientation, &p, false);
+        let mut checked = 0;
+        for y in (0..out.1).step_by(3) {
+            for x in (0..out.0).step_by(3) {
+                let (u, v) = (
+                    (f64::from(x) + 0.5) / f64::from(out.0),
+                    (f64::from(y) + 0.5) / f64::from(out.1),
+                );
+                let Some([sx, sy]) = geom.output_to_source(u, v) else {
+                    continue;
+                };
+                let m = mask.weight(sx, sy, (w, h));
+                let want = enc(0.25 * 2f32.powf(-m as f32));
+                let got = px(&out, x, y);
+                assert!(
+                    (got[0] - want).abs() <= 4.0,
+                    "tag {tag} straighten {straighten} at ({x},{y}): got {} want {want} (m={m:.2})",
+                    got[0]
+                );
+                checked += 1;
+            }
+        }
+        assert!(checked > 100);
+    }
+}
+
+#[test]
+fn brush_zones_brighten_only_the_painted_area_in_any_orientation() {
+    let Some(g) = gpu() else { return };
+    let (w, h) = (120u32, 80u32);
+    let mut pl = Pipeline::new(&g, &flat(w, h, [0.2; 3])).unwrap();
+    let mut zone = LocalAdjustment::new(
+        "z1",
+        "Zone 1",
+        MaskDef::Brush {
+            strokes: vec![Stroke {
+                size: 0.2,
+                feather: 0.0,
+                points: vec![[0.25, 0.3], [0.3, 0.35]],
+                ..Default::default()
+            }],
+        },
+    );
+    zone.adjust.exposure = 1.0;
+    for tag in [1, 6, 2] {
+        let p = with_local(std::slice::from_ref(&zone));
+        let mut req = RenderRequest::new(p.clone(), 128);
+        req.orientation = Orientation::from_exif(tag);
+        let stats = pl.render(&req).unwrap();
+        assert!(stats.ran.local);
+        let out = pl.read_output_rgba8().unwrap();
+        let geom = geometry::resolve((w, h), req.orientation, &p, false);
+        let at = |sx: f64, sy: f64| {
+            let [u, v] = geom.source_to_output(sx, sy);
+            px(
+                &out,
+                (u * f64::from(out.0)) as u32,
+                (v * f64::from(out.1)) as u32,
+            )
+        };
+        assert_px(at(0.275, 0.325), [enc(0.4); 3], 4.0, "painted");
+        assert_px(at(0.8, 0.8), [enc(0.2); 3], 2.0, "untouched");
+    }
+}
+
+#[test]
+fn erasing_takes_the_area_back_out_of_the_zone() {
+    let Some(g) = gpu() else { return };
+    let mut pl = Pipeline::new(&g, &flat(100, 100, [0.2; 3])).unwrap();
+    let paint = Stroke {
+        size: 0.4,
+        feather: 0.0,
+        points: vec![[0.3, 0.5], [0.7, 0.5]],
+        ..Default::default()
+    };
+    let erase = Stroke {
+        size: 0.1,
+        feather: 0.0,
+        erase: true,
+        points: vec![[0.5, 0.5]],
+        ..Default::default()
+    };
+    let mut zone = LocalAdjustment::new(
+        "z1",
+        "Zone 1",
+        MaskDef::Brush {
+            strokes: vec![paint.clone()],
+        },
+    );
+    zone.adjust.exposure = 1.0;
+    let painted = render(&mut pl, with_local(std::slice::from_ref(&zone)), 100);
+    assert_px(px(&painted, 50, 50), [enc(0.4); 3], 4.0, "painted");
+    // The erase stroke streams in after the paint: incremental update.
+    let MaskDef::Brush { strokes } = &mut zone.mask else {
+        unreachable!()
+    };
+    strokes.push(erase);
+    let erased = render(&mut pl, with_local(std::slice::from_ref(&zone)), 100);
+    assert_px(px(&erased, 50, 50), [enc(0.2); 3], 4.0, "erased");
+    assert_px(px(&erased, 35, 50), [enc(0.4); 3], 4.0, "still painted");
+}
+
+#[test]
+fn a_full_frame_mask_equals_the_global_control_and_zero_is_a_no_op() {
+    let Some(g) = gpu() else { return };
+    let img = raw(
+        64,
+        48,
+        |x, y| {
+            let v = 0.02 + 0.6 * (x as f32 / 63.0);
+            [v, v * 0.8, v * (0.5 + y as f32 / 96.0)]
+        },
+        camera(None),
+    );
+    let mut pl = Pipeline::new(&g, &img).unwrap();
+    let mut global = EditParams::default();
+    global.set::<Exposure>(ExposureParams { ev: 1.0 });
+    let want = render(&mut pl, global, 64);
+    // A gradient whose line is far above the frame covers everything.
+    let all = gradient_adj(
+        LinearMask {
+            x: 0.5,
+            y: -5.0,
+            angle: 0.0,
+            feather: 0.01,
+        },
+        exposure_tone(1.0),
+    );
+    let mut p = EditParams::default();
+    p.set_local_adjustments(std::slice::from_ref(&all));
+    let got = render(&mut pl, p, 64);
+    for (a, b) in got.2.iter().zip(&want.2) {
+        assert!((i32::from(*a) - i32::from(*b)).abs() <= 2, "{a} vs {b}");
+    }
+
+    // Zeroed sliders: the pass doesn't even run and the image is unchanged.
+    let base = render(&mut pl, EditParams::default(), 64);
+    let mut zero = all;
+    zero.adjust = LocalTone::default();
+    let p = EditParams {
+        local: vec![serde_json::to_value(&zero).unwrap()],
+        ..Default::default()
+    };
+    let stats = pl.render(&RenderRequest::new(p, 64)).unwrap();
+    assert!(!stats.ran.local);
+    assert_eq!(pl.read_output_rgba8().unwrap().2, base.2);
+}
+
+#[test]
+fn a_proxy_render_matches_a_downscaled_full_resolution_one() {
+    let Some(g) = gpu() else { return };
+    let (w, h) = (256u32, 192u32);
+    let img = raw(
+        w,
+        h,
+        |x, y| {
+            let t = x as f32 / (w - 1) as f32;
+            let v = 0.01 + 0.8 * t * t;
+            [v, v * 0.9, v * (0.6 + 0.4 * y as f32 / h as f32)]
+        },
+        camera(None),
+    );
+    let mut pl = Pipeline::new(&g, &img).unwrap();
+    let adj = gradient_adj(
+        LinearMask {
+            x: 0.5,
+            y: 0.5,
+            angle: 15.0,
+            feather: 0.4,
+        },
+        LocalTone {
+            exposure: -0.7,
+            shadows: 40.0,
+            highlights: -30.0,
+            whites: 20.0,
+            ..Default::default()
+        },
+    );
+    let mut p = EditParams::default();
+    p.set_local_adjustments(&[adj]);
+    let full = render(&mut pl, p.clone(), 256);
+    let small = render(&mut pl, p, 64);
+    assert_eq!((small.0, small.1), (64, 48));
+    let (mut sum, mut worst) = (0.0f32, 0.0f32);
+    for y in 0..48u32 {
+        for x in 0..64u32 {
+            let mut avg = [0.0f32; 3];
+            for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
+                let p = px(&full, x * 4 + dx + 1, y * 4 + dy + 1);
+                for c in 0..3 {
+                    avg[c] += p[c] / 4.0;
+                }
+            }
+            let got = px(&small, x, y);
+            for c in 0..3 {
+                let d = (avg[c] - got[c]).abs();
+                sum += d;
+                worst = worst.max(d);
+            }
+        }
+    }
+    let mean = sum / (64.0 * 48.0 * 3.0);
+    assert!(mean < 2.5 && worst < 14.0, "mean {mean}, worst {worst}");
+}
+
+#[test]
+fn moving_a_gradient_reruns_only_the_local_pass_and_what_follows() {
+    let Some(g) = gpu() else { return };
+    let mut pl = Pipeline::new(&g, &flat(64, 48, [0.3; 3])).unwrap();
+    let mut mask = LinearMask {
+        x: 0.5,
+        y: 0.5,
+        angle: 0.0,
+        feather: 0.2,
+    };
+    let render_with = |pl: &mut Pipeline, mask: LinearMask| {
+        pl.render(&RenderRequest::new(
+            with_local(&[gradient_adj(mask, exposure_tone(-1.0))]),
+            64,
+        ))
+        .unwrap()
+        .ran
+    };
+    let first = render_with(&mut pl, mask);
+    assert!(first.local && first.geometry && first.scene);
+    mask.y = 0.3;
+    let ran = render_with(&mut pl, mask);
+    assert!(ran.local && ran.tone && ran.output);
+    assert!(!ran.geometry && !ran.scene, "{ran:?}");
+    assert_eq!(render_with(&mut pl, mask), Default::default());
+}
+
+#[test]
+fn the_mask_overlay_tints_the_selected_mask_red_even_before_it_adjusts_anything() {
+    let Some(g) = gpu() else { return };
+    let mut pl = Pipeline::new(&g, &flat(64, 64, [0.25; 3])).unwrap();
+    let mut adj = gradient_adj(
+        LinearMask {
+            x: 0.5,
+            y: 0.5,
+            angle: 0.0,
+            feather: 0.05,
+        },
+        LocalTone::default(),
+    );
+    adj.enabled = true;
+    // Zero sliders are dropped by `set_local_adjustments`; a draft keeps them.
+    let mut p = linear_profile();
+    p.local = vec![serde_json::to_value(&adj).unwrap()];
+    let mut req = RenderRequest::new(p, 64);
+    req.mask_overlay = Some("g1".into());
+    let stats = pl.render(&req).unwrap();
+    assert!(stats.ran.mask_overlay);
+    let out = pl.read_output_rgba8().unwrap();
+    let below = px(&out, 32, 56);
+    let above = px(&out, 32, 8);
+    assert!(below[0] > below[1] + 40.0, "tinted: {below:?}");
+    assert_px(above, [enc(0.25); 3], 2.0, "untinted");
+    // Exports never carry the overlay.
+    req.depth16 = true;
+    assert!(!pl.render(&req).unwrap().ran.mask_overlay);
+}

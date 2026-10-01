@@ -67,7 +67,8 @@ If you've ever spent an evening in a well-known room full of light, your fingers
 - White balance, exposure, contrast, highlights, shadows, whites and blacks
 - Tone curve (parametric and point), HSL and B&W mixer
 - Clarity, sharpening, and luminance and color noise reduction
-- Crop and straighten, with overlays
+- Crop and straighten, with overlays; drag outside a corner of the crop box to rotate
+- Red eye and pet eye correction, linear gradients and brush zones, each with Exposure, Contrast, Highlights, Shadows, Whites and Blacks
 - Vignette
 - Histogram, clipping display, before/after, eyedropper, Auto Tone and Auto WB
 - Persistent history, copy/paste settings, and presets (with `.arpreset` import/export)
@@ -95,7 +96,13 @@ If you've ever spent an evening in a well-known room full of light, your fingers
 | `W` | White balance eyedropper (Develop) |
 | `V` | Switch color / B&W (Develop) |
 | `\` | Before / after (Develop) |
-| `O` | Cycle crop overlay (Develop) |
+| `R` | Crop & straighten (Develop) |
+| `Shift+R` | Red eye / pet eye (Develop) |
+| `M` / `K` | Gradient / brush zone (Develop) |
+| `Enter` / `Esc` | Apply / cancel the open tool (Develop) |
+| `O` | Cycle crop overlay, or show the mask of a gradient or brush zone (Develop) |
+| `'` | Flip the selected gradient (Develop) |
+| `[` / `]`, `Shift+[` / `Shift+]` | Brush size, feather; `Alt` paints as erase (Develop) |
 | `Ctrl+Shift+C` / `Ctrl+Shift+V` | Copy / paste settings (Develop) |
 
 ## Building

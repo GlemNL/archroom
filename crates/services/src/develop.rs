@@ -127,6 +127,9 @@ pub fn paste_groups(
     source: &EditParams,
     groups: &[viberoom_engine::SettingsGroup],
 ) {
+    if groups.contains(&viberoom_engine::SettingsGroup::LocalAdjustments) {
+        target.local.clone_from(&source.local);
+    }
     let registry = viberoom_engine::ops::default_registry();
     for op in registry.iter() {
         if !groups.contains(&op.group()) {
@@ -150,6 +153,42 @@ mod tests {
     use viberoom_catalog::Catalog;
     use viberoom_catalog::repo::{self, NewFile, NewPhoto};
     use viberoom_engine::ops::{Exposure, ExposureParams};
+
+    #[test]
+    fn local_adjustments_and_red_eye_paste_as_their_own_groups() {
+        use viberoom_engine::SettingsGroup;
+        use viberoom_engine::local::{LinearMask, LocalAdjustment, MaskDef};
+        use viberoom_engine::ops::{EyeSpot, RedEye, RedEyeParams};
+        let mut source = EditParams::default();
+        let mut a = LocalAdjustment::new(
+            "g1",
+            "Gradient 1",
+            MaskDef::Linear(LinearMask {
+                x: 0.5,
+                y: 0.5,
+                angle: 0.0,
+                feather: 0.2,
+            }),
+        );
+        a.adjust.exposure = -1.0;
+        source.set_local_adjustments(&[a]);
+        source.set::<RedEye>(RedEyeParams {
+            spots: vec![EyeSpot::default()],
+        });
+        let mut target = EditParams::default();
+        paste_groups(&mut target, &source, &[SettingsGroup::LocalAdjustments]);
+        assert_eq!(target.local, source.local);
+        assert!(target.ops.is_empty(), "red eye is a separate group");
+        paste_groups(&mut target, &source, &[SettingsGroup::RedEye]);
+        assert!(target.ops.contains_key("red_eye"));
+        // An empty source resets the target's group.
+        paste_groups(
+            &mut target,
+            &EditParams::default(),
+            &[SettingsGroup::LocalAdjustments],
+        );
+        assert!(target.local.is_empty());
+    }
 
     fn photo(conn: &Connection) -> PhotoId {
         let folder = repo::upsert_folder_path(conn, std::path::Path::new("/p")).unwrap();
@@ -207,6 +246,43 @@ mod tests {
             "unedited ⇒ no row"
         );
         assert_eq!(develop::list_history(conn, id).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn local_adjustments_and_red_eye_survive_a_reopen_and_undo() {
+        use viberoom_engine::local::{LinearMask, LocalAdjustment, MaskDef};
+        use viberoom_engine::ops::{EyeSpot, RedEye, RedEyeParams};
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("T.arcat");
+        let mut p = EditParams::default();
+        let mut a = LocalAdjustment::new(
+            "g1",
+            "Gradient 1",
+            MaskDef::Linear(LinearMask {
+                x: 0.5,
+                y: 0.4,
+                angle: 10.0,
+                feather: 0.2,
+            }),
+        );
+        a.adjust.exposure = -0.8;
+        p.set_local_adjustments(&[a]);
+        p.set::<RedEye>(RedEyeParams {
+            spots: vec![EyeSpot::default()],
+        });
+        let id;
+        {
+            let c = Catalog::create_or_open(&path).unwrap();
+            id = photo(c.connection());
+            save_edit(c.connection(), id, "Add Gradient", &p, None).unwrap();
+        }
+        let c = Catalog::create_or_open(&path).unwrap();
+        let loaded = load_params(c.connection(), id).unwrap();
+        assert_eq!(loaded, p);
+        assert_eq!(loaded.local_adjustments().len(), 1);
+        let rows = develop::list_history(c.connection(), id).unwrap();
+        let (_, before) = undo_target(&rows, None).unwrap();
+        assert!(before.is_identity(), "undo removes both");
     }
 
     #[test]
