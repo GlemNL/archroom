@@ -208,6 +208,37 @@ fn in_rotate_zone(crop_rect: Rect, pos: Pos2) -> bool {
         .any(|c| c.distance(pos) <= ROTATE_REACH)
 }
 
+/// A rotate cursor (egui has none): a three-quarter arc with an arrowhead,
+/// white on a dark outline so it reads on any photo.
+fn rotate_cursor(painter: &egui::Painter, c: Pos2) {
+    const R: f32 = 9.0;
+    let at = |a: f32| c + egui::vec2(a.cos(), a.sin()) * R;
+    let (start, end) = (-0.6_f32, 4.4_f32);
+    let arc: Vec<Pos2> = (0..=24)
+        .map(|i| at(start + (end - start) * i as f32 / 24.0))
+        .collect();
+    // The arrowhead at the arc's end, pointing along the travel direction.
+    let tip = at(end);
+    let dir = egui::vec2(-end.sin(), end.cos());
+    let side = egui::vec2(-dir.y, dir.x);
+    let head = vec![
+        tip + dir * 5.0,
+        tip - dir * 2.0 + side * 5.0,
+        tip - dir * 2.0 - side * 5.0,
+    ];
+    for (w, col) in [
+        (4.0_f32, Color32::from_black_alpha(200)),
+        (2.0, Color32::WHITE),
+    ] {
+        painter.add(egui::Shape::line(arc.clone(), Stroke::new(w, col)));
+    }
+    painter.add(egui::Shape::convex_polygon(
+        head,
+        Color32::WHITE,
+        Stroke::new(1.0_f32, Color32::from_black_alpha(200)),
+    ));
+}
+
 fn handle_cursor(h: Handle) -> CursorIcon {
     match h {
         Handle::Tl | Handle::Br => CursorIcon::ResizeNwSe,
@@ -624,11 +655,15 @@ impl CropTool {
             } else if crop_rect.contains(pos) {
                 ui.ctx().set_cursor_icon(CursorIcon::Move);
             } else if in_rotate_zone(crop_rect, pos) {
-                ui.ctx().set_cursor_icon(CursorIcon::Grab);
+                ui.ctx().set_cursor_icon(CursorIcon::None);
+                rotate_cursor(&ui.painter().clone(), pos);
             }
         }
         if matches!(self.drag, Some(Drag::Rotate { .. })) {
-            ui.ctx().set_cursor_icon(CursorIcon::Grabbing);
+            ui.ctx().set_cursor_icon(CursorIcon::None);
+            if let Some(pos) = ui.input(|i| i.pointer.latest_pos()) {
+                rotate_cursor(&ui.painter().clone(), pos);
+            }
         }
 
         let mut out = None;
