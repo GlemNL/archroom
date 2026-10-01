@@ -72,7 +72,8 @@ fn band_slider(ui: &mut egui::Ui, band: usize, value: &mut f64) -> bool {
             LrSlider::new(BANDS[band], &mut x, -100.0..=100.0)
                 .step(1.0, 5.0)
                 .decimals(0)
-                .label_width(62.0),
+                .label_width(62.0)
+                .accent(egui::Color32::from_rgb(c[0], c[1], c[2])),
         );
     });
     if x == before {

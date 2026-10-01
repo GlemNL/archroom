@@ -18,6 +18,7 @@ pub struct LrSlider<'a> {
     label_width: f32,
     formatter: Option<fn(f32) -> String>,
     parser: Option<fn(&str) -> Option<f32>>,
+    accent: Option<egui::Color32>,
 }
 
 impl<'a> LrSlider<'a> {
@@ -36,6 +37,7 @@ impl<'a> LrSlider<'a> {
             label_width: 90.0,
             formatter: None,
             parser: None,
+            accent: None,
         }
     }
 
@@ -65,6 +67,12 @@ impl<'a> LrSlider<'a> {
         self
     }
 
+    /// Colours the filled part of the track (the colour bands of HSL).
+    pub fn accent(mut self, color: egui::Color32) -> Self {
+        self.accent = Some(color);
+        self
+    }
+
     /// Shows the value through `format` and reads typed text through
     /// `parse`, for sliders whose track isn't the displayed unit (Temp is
     /// linear in mireds but reads in kelvin).
@@ -89,6 +97,7 @@ impl Widget for LrSlider<'_> {
             label_width,
             formatter,
             parser,
+            accent,
         } = self;
 
         ui.horizontal(|ui| {
@@ -108,11 +117,18 @@ impl Widget for LrSlider<'_> {
             ui.spacing_mut().slider_width =
                 (ui.available_width() - VALUE_WIDTH - spacing).max(40.0);
 
-            let drag_response = ui.add(
-                egui::Slider::new(value, range.clone())
-                    .show_value(false)
-                    .trailing_fill(true),
-            );
+            let drag_response = ui
+                .scope(|ui| {
+                    if let Some(c) = accent {
+                        ui.visuals_mut().selection.bg_fill = c;
+                    }
+                    ui.add(
+                        egui::Slider::new(value, range.clone())
+                            .show_value(false)
+                            .trailing_fill(true),
+                    )
+                })
+                .inner;
 
             if drag_response.hovered() {
                 let scroll = ui.input(|i| i.raw_scroll_delta.y);
