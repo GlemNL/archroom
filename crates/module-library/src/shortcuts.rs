@@ -48,7 +48,13 @@ fn typing_in_text_field(ctx: &egui::Context) -> bool {
         .is_some_and(|id| egui::TextEdit::load_state(ctx, id).is_some())
 }
 
-pub fn handle(ui: &egui::Ui, cx: &mut AppCx, ordered: &[PhotoId], focus_keyword_entry: &mut bool) {
+pub fn handle(
+    ui: &egui::Ui,
+    cx: &mut AppCx,
+    ordered: &[PhotoId],
+    focus_keyword_entry: &mut bool,
+    want_remove: &mut bool,
+) {
     if typing_in_text_field(ui.ctx()) {
         // A text field (Keywording, the filter bar) has focus — don't steal
         // its digits/letters as rating/flag/label shortcuts.
@@ -60,6 +66,14 @@ pub fn handle(ui: &egui::Ui, cx: &mut AppCx, ordered: &[PhotoId], focus_keyword_
     // painted before `center()` runs, so the focus lands next frame).
     if ui.input(|i| i.modifiers.command && i.key_pressed(egui::Key::K)) {
         *focus_keyword_entry = true;
+    }
+
+    // Delete / Backspace open the Remove dialog (never act directly).
+    if ui.input(|i| {
+        !i.modifiers.command
+            && (i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace))
+    }) {
+        *want_remove = true;
     }
 
     if ui.input(|i| !i.modifiers.command && i.key_pressed(egui::Key::B)) {
@@ -149,8 +163,13 @@ pub fn create_virtual_copies(cx: &mut AppCx) {
     if ids.is_empty() {
         return;
     }
+    let sources = ids.clone();
     match cx.apply_command_event(Box::new(CreateVirtualCopies::new(ids))) {
         Ok(Some(viberoom_core::events::CatalogEvent::PhotosAdded { ids, .. })) => {
+            if let Some(previews) = &cx.previews {
+                let pairs: Vec<_> = sources.iter().copied().zip(ids.iter().copied()).collect();
+                viberoom_services::preview::copy_previews(previews, &pairs);
+            }
             if let Some((first, rest)) = ids.split_first() {
                 cx.selection.select_single(*first);
                 for id in rest {

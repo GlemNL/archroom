@@ -145,6 +145,18 @@ const CASES: &[(&str, &str)] = &[
         r#"{"process_version":1,"ops":{"vignette":{"v":1,"amount":-50,"midpoint":40,"roundness":20,"feather":60,"highlights":30}}}"#,
     ),
     (
+        "red_eye",
+        r#"{"process_version":1,"ops":{"red_eye":{"v":1,"spots":[{"x":0.4167,"y":0.2812,"r":0.043,"mode":"red","darken":60},{"x":0.83,"y":0.625,"r":0.03,"mode":"pet","darken":70,"catchlight":true}]}}}"#,
+    ),
+    (
+        "local_gradient",
+        r#"{"process_version":1,"ops":{},"local":[{"v":1,"id":"g1","name":"Gradient 1","enabled":true,"mask":{"kind":"linear","x":0.5,"y":0.45,"angle":5,"feather":0.25},"adjust":{"exposure":-1.2,"highlights":-30}}]}"#,
+    ),
+    (
+        "local_brush",
+        r#"{"process_version":1,"ops":{},"local":[{"v":1,"id":"z1","name":"Zone 1","enabled":true,"mask":{"kind":"brush","strokes":[{"size":0.12,"feather":0.6,"flow":1.0,"erase":false,"points":[[0.3,0.2],[0.45,0.25],[0.6,0.2]]}]},"adjust":{"exposure":0.8,"shadows":30}}]}"#,
+    ),
+    (
         "everything",
         r#"{"process_version":1,"ops":{"white_balance":{"v":1,"mode":"custom","temp":5200,"tint":-6},"exposure":{"v":1,"ev":0.4},"tone":{"v":1,"contrast":15,"highlights":-30,"shadows":35,"whites":10,"blacks":-8},"presence":{"v":1,"vibrance":25,"saturation":5}}}"#,
     ),

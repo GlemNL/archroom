@@ -9,12 +9,14 @@ mod curve;
 mod detail;
 mod effects;
 mod geometry;
+mod redeye;
 
 pub use color::{BAND_HUES_DEG, BANDS, BwMix, BwMixParams, Hsl, HslParams};
 pub use curve::{LUT_SIZE, MonotoneCurve, ToneCurve, ToneCurveParams, build_luts};
 pub use detail::{Clarity, ClarityParams, Noise, NoiseParams, Sharpen, SharpenParams};
 pub use effects::{Vignette, VignetteParams};
 pub use geometry::{Crop, CropParams, Straighten, StraightenParams};
+pub use redeye::{EyeMode, EyeSpot, MAX_SPOTS, RedEye, RedEyeParams};
 
 use crate::op::{Curve, Op, ParamSpec, Registry, SettingsGroup, Stage, Track};
 
@@ -25,6 +27,7 @@ pub fn default_registry() -> Registry {
     r.register::<Crop>();
     r.register::<WhiteBalance>();
     r.register::<Exposure>();
+    r.register::<RedEye>();
     r.register::<Profile>();
     r.register::<Tone>();
     r.register::<Presence>();
@@ -267,6 +270,7 @@ mod tests {
                 "crop",
                 "white_balance",
                 "exposure",
+                "red_eye",
                 "noise",
                 "clarity",
                 "profile",

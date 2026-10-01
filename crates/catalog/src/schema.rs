@@ -193,8 +193,16 @@ CREATE TABLE export_presets (
 );
 "#;
 
+/// Soft delete: "Remove from catalog" only stamps
+/// `removed_at`, so undo can bring the photo back with everything it had.
+/// Rows are purged for good at the next catalog open (`repo::purge_removed`).
+const V4: &str = r#"
+ALTER TABLE photos ADD COLUMN removed_at TEXT;
+CREATE INDEX idx_photos_removed_at ON photos(removed_at);
+"#;
+
 pub fn migrations() -> Migrations<'static> {
-    Migrations::new(vec![M::up(V1), M::up(V2), M::up(V3)])
+    Migrations::new(vec![M::up(V1), M::up(V2), M::up(V3), M::up(V4)])
 }
 
 #[cfg(test)]

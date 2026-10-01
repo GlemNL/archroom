@@ -668,6 +668,76 @@ impl Command for CreateVirtualCopies {
     }
 }
 
+/// How a removal was requested; only changes the undo-menu label. The file
+/// move for [`Removal::Trash`] is done by the caller (`viberoom-services`)
+/// *before* this command is applied, so this crate never touches files.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Removal {
+    Catalog,
+    Trash,
+}
+
+/// Soft-deletes photos: stamps `photos.removed_at` and
+/// nothing else, so keywords, collections, history and develop settings are
+/// all still there when `revert` clears the stamp. Never deletes a row.
+#[derive(Debug)]
+pub struct RemovePhotos {
+    photo_ids: Vec<PhotoId>,
+    kind: Removal,
+    /// The ids this command actually removed (already-removed ones are skipped).
+    removed: Vec<PhotoId>,
+}
+
+impl RemovePhotos {
+    pub fn new(photo_ids: Vec<PhotoId>, kind: Removal) -> Self {
+        Self {
+            photo_ids,
+            kind,
+            removed: Vec::new(),
+        }
+    }
+}
+
+impl Command for RemovePhotos {
+    fn label(&self) -> String {
+        let n = self.photo_ids.len();
+        match self.kind {
+            Removal::Catalog => format!("Remove {n} Photo{} from Catalog", photo_count_suffix(n)),
+            Removal::Trash => format!("Move {n} Photo{} to Trash", photo_count_suffix(n)),
+        }
+    }
+
+    fn apply(&mut self, conn: &Connection) -> Result<CatalogEvent> {
+        self.removed.clear();
+        for &id in &self.photo_ids {
+            let n = conn.execute(
+                "UPDATE photos SET removed_at = datetime('now')
+                 WHERE id = ?1 AND removed_at IS NULL",
+                params![id.get()],
+            )?;
+            if n > 0 {
+                self.removed.push(id);
+            }
+        }
+        Ok(CatalogEvent::PhotosRemoved {
+            ids: self.removed.clone(),
+        })
+    }
+
+    fn revert(&mut self, conn: &Connection) -> Result<CatalogEvent> {
+        for &id in &self.removed {
+            conn.execute(
+                "UPDATE photos SET removed_at = NULL WHERE id = ?1",
+                params![id.get()],
+            )?;
+        }
+        Ok(CatalogEvent::PhotosAdded {
+            ids: self.removed.clone(),
+            import_id: None,
+        })
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -1127,5 +1197,250 @@ mod tests {
             )
             .unwrap();
         assert_eq!(left, 0);
+    }
+
+    /// A photo with everything hanging off it: keyword, collection, history,
+    /// snapshot, develop settings.
+    fn seed_loaded_photo(conn: &Connection, name: &str) -> (PhotoId, CollectionId) {
+        let p = seed_photo_named(conn, name);
+        let kw = repo::upsert_keyword_path(conn, &["Places", "Paris"]).unwrap();
+        repo::add_photo_keyword(conn, p, kw).unwrap();
+        let coll = collections::create_collection(
+            conn,
+            collections::CollectionKind::Regular,
+            "Best",
+            None,
+            None,
+        )
+        .unwrap();
+        collections::add_photos(conn, coll, &[p]).unwrap();
+        conn.execute(
+            "UPDATE photos SET rating = 4 WHERE id = ?1",
+            params![p.get()],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO develop_settings (photo_id, process_version, params, params_hash)
+             VALUES (?1, 1, '{}', x'00')",
+            params![p.get()],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO history (photo_id, seq, label, params) VALUES (?1, 1, 'x', '{}')",
+            params![p.get()],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO snapshots (photo_id, name, params) VALUES (?1, 's', '{}')",
+            params![p.get()],
+        )
+        .unwrap();
+        (p, coll)
+    }
+
+    fn rows(conn: &Connection, table: &str, p: PhotoId) -> i64 {
+        conn.query_row(
+            &format!("SELECT count(*) FROM {table} WHERE photo_id = ?1"),
+            params![p.get()],
+            |r| r.get(0),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn remove_hides_the_photo_from_every_listing_and_undo_restores_everything() {
+        use crate::collections::{PhotoSource, list_photos};
+        use crate::repo::PhotoSort;
+        let dir = tempfile::tempdir().unwrap();
+        let catalog = Catalog::create_or_open(dir.path().join("t.arcat")).unwrap();
+        let conn = catalog.connection();
+        let (a, coll) = seed_loaded_photo(conn, "a.jpg");
+        let b = seed_photo_named(conn, "b.jpg");
+        let folder = repo::list_folders(conn).unwrap()[0].id;
+        let all = |conn: &Connection| {
+            list_photos(conn, &PhotoSource::All, &[], true, PhotoSort::Filename).unwrap()
+        };
+        assert_eq!(all(conn).len(), 2);
+
+        let mut cmd = RemovePhotos::new(vec![a], Removal::Catalog);
+        assert_eq!(cmd.label(), "Remove 1 Photo from Catalog");
+        assert!(matches!(
+            cmd.apply(conn).unwrap(),
+            CatalogEvent::PhotosRemoved { .. }
+        ));
+
+        // Every listing/counting path skips it.
+        let ids =
+            |v: Vec<repo::PhotoSummary>| v.into_iter().map(|p| p.photo_id).collect::<Vec<_>>();
+        assert_eq!(ids(all(conn)), vec![b]);
+        assert_eq!(
+            ids(repo::list_all_photos(conn, PhotoSort::Filename).unwrap()),
+            vec![b]
+        );
+        assert_eq!(
+            ids(repo::list_photos_for_folder(conn, folder, PhotoSort::Filename).unwrap()),
+            vec![b]
+        );
+        assert_eq!(
+            ids(list_photos(
+                conn,
+                &PhotoSource::Collection(coll),
+                &[],
+                true,
+                PhotoSort::Filename
+            )
+            .unwrap()),
+            Vec::<PhotoId>::new()
+        );
+        assert_eq!(repo::count_all_photos(conn).unwrap(), 1);
+        assert_eq!(repo::list_folders(conn).unwrap()[0].file_count, 1);
+        let kw = repo::list_keywords(conn).unwrap();
+        assert!(kw.iter().all(|k| k.photo_count == 0));
+        let c = collections::list_collections(conn).unwrap();
+        assert_eq!(c.iter().find(|c| c.id == coll).unwrap().count, 0);
+
+        // Nothing was deleted: the rows are all still there.
+        for t in [
+            "photo_keywords",
+            "collection_photos",
+            "develop_settings",
+            "history",
+            "snapshots",
+        ] {
+            assert_eq!(rows(conn, t, a), 1, "{t}");
+        }
+
+        assert!(matches!(
+            cmd.revert(conn).unwrap(),
+            CatalogEvent::PhotosAdded { .. }
+        ));
+        assert_eq!(all(conn).len(), 2);
+        assert_eq!(repo::count_all_photos(conn).unwrap(), 2);
+        assert_eq!(repo::list_folders(conn).unwrap()[0].file_count, 2);
+        assert_eq!(
+            repo::list_keywords(conn)
+                .unwrap()
+                .iter()
+                .map(|k| k.photo_count)
+                .max(),
+            Some(1)
+        );
+        let rating: i32 = conn
+            .query_row(
+                "SELECT rating FROM photos WHERE id = ?1",
+                params![a.get()],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(rating, 4);
+    }
+
+    #[test]
+    fn removing_twice_only_undoes_what_it_removed() {
+        let dir = tempfile::tempdir().unwrap();
+        let catalog = Catalog::create_or_open(dir.path().join("t.arcat")).unwrap();
+        let conn = catalog.connection();
+        let a = seed_photo_named(conn, "a.jpg");
+        let mut first = RemovePhotos::new(vec![a], Removal::Catalog);
+        first.apply(conn).unwrap();
+        let mut second = RemovePhotos::new(vec![a], Removal::Trash);
+        second.apply(conn).unwrap();
+        second.revert(conn).unwrap();
+        assert_eq!(
+            repo::count_all_photos(conn).unwrap(),
+            0,
+            "second removed nothing, so it restores nothing"
+        );
+        first.revert(conn).unwrap();
+        assert_eq!(repo::count_all_photos(conn).unwrap(), 1);
+    }
+
+    #[test]
+    fn purge_runs_at_open_and_only_touches_removed_photos() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("t.arcat");
+        let (gone, kept) = {
+            let catalog = Catalog::create_or_open(&path).unwrap();
+            let conn = catalog.connection();
+            let (gone, _) = seed_loaded_photo(conn, "gone.jpg");
+            let kept = seed_photo_named(conn, "kept.jpg");
+            RemovePhotos::new(vec![gone], Removal::Catalog)
+                .apply(conn)
+                .unwrap();
+            // Still undoable within the session: not purged yet.
+            assert_eq!(rows(conn, "history", gone), 1);
+            (gone, kept)
+        };
+        let catalog = Catalog::create_or_open(&path).unwrap();
+        let conn = catalog.connection();
+        assert_eq!(
+            rows(conn, "history", gone),
+            1,
+            "reopening alone must not purge"
+        );
+        assert_eq!(catalog.purge_removed().unwrap(), 1);
+        for t in [
+            "photo_keywords",
+            "collection_photos",
+            "develop_settings",
+            "history",
+            "snapshots",
+        ] {
+            assert_eq!(rows(conn, t, gone), 0, "{t}");
+        }
+        let photos: i64 = conn
+            .query_row("SELECT count(*) FROM photos", [], |r| r.get(0))
+            .unwrap();
+        let files: i64 = conn
+            .query_row("SELECT count(*) FROM files", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!((photos, files), (1, 1));
+        assert_eq!(repo::count_all_photos(conn).unwrap(), 1);
+        assert!(repo::photo_file_info(conn, kept).unwrap().is_some());
+        // The shared folder still has a file, so it stays.
+        assert_eq!(repo::list_folders(conn).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn purge_keeps_a_file_that_a_virtual_copy_still_uses_and_drops_empty_folders() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("t.arcat");
+        {
+            let catalog = Catalog::create_or_open(&path).unwrap();
+            let conn = catalog.connection();
+            let orig = seed_photo_named(conn, "a.jpg");
+            let mut vc = CreateVirtualCopies::new(vec![orig]);
+            vc.apply(conn).unwrap();
+            // Remove the original only: the virtual copy shares the file.
+            RemovePhotos::new(vec![orig], Removal::Catalog)
+                .apply(conn)
+                .unwrap();
+        }
+        {
+            let catalog = Catalog::create_or_open(&path).unwrap();
+            catalog.purge_removed().unwrap();
+            let conn = catalog.connection();
+            let files: i64 = conn
+                .query_row("SELECT count(*) FROM files", [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(files, 1, "the copy still needs the file row");
+            assert_eq!(repo::count_all_photos(conn).unwrap(), 1);
+            let copy: PhotoId = PhotoId::new(
+                conn.query_row("SELECT id FROM photos", [], |r| r.get(0))
+                    .unwrap(),
+            );
+            RemovePhotos::new(vec![copy], Removal::Catalog)
+                .apply(conn)
+                .unwrap();
+        }
+        let catalog = Catalog::create_or_open(&path).unwrap();
+        catalog.purge_removed().unwrap();
+        let conn = catalog.connection();
+        for t in ["photos", "files", "folders"] {
+            let n: i64 = conn
+                .query_row(&format!("SELECT count(*) FROM {t}"), [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(n, 0, "{t}");
+        }
     }
 }

@@ -16,7 +16,7 @@ Catalog thousands of photos, cull them from the keyboard, and develop raws on th
 </div>
 
 > [!NOTE]
-> Viberoom is **pre-release (v0.1 in progress)**. Import, organizing, Develop and Export work. Expect rough edges: keep your originals backed up (Viberoom never modifies them) and see [Status](#status).
+> Viberoom is **pre-release (v0.2.0)**. Import, organizing, Develop (including local adjustments) and Export work. Expect rough edges: keep your originals backed up (Viberoom never modifies them) and see [Status](#status).
 
 ## Screenshots
 
@@ -32,7 +32,7 @@ Linux has excellent raw tools, but few that pair a fast catalog with a develop w
 
 If you've ever spent an evening in a well-known room full of light, your fingers will find their way around here: the panel order, the slider names and the shortcuts will feel familiar. Everything else is new, open source, and yours.
 
-- **Non-destructive.** Originals are opened read-only. Edits are stored as parameters in the catalog, so every edit can be undone or changed later.
+- **Non-destructive.** Originals are opened read-only. Edits are stored as parameters in the catalog, so every edit can be undone or changed later. Removing a photo never deletes a file: it either leaves the catalog (file untouched) or goes to the system trash, and both can be undone.
 - **GPU-first.** Development runs on a scene-referred, linear-light float pipeline in WGSL compute shaders (via `wgpu`/Vulkan). Sliders re-render in well under a millisecond on a modern GPU.
 - **Built for large catalogs.** The Grid is virtualized, work runs as background jobs, and the UI never waits on decoding or disk.
 - **Plays well with others.** Ratings, labels and keywords are written to standard XMP sidecars that darktable and digiKam can read.
@@ -45,10 +45,13 @@ If you've ever spent an evening in a well-known room full of light, your fingers
 - Raw (via LibRaw), JPEG, PNG and TIFF, with embedded ICC profile handling
 - Virtualized Grid, Loupe and filmstrip, plus a folder tree
 - Ratings, flags and color labels, with undo/redo for every change
+- Virtual copies, each with its own edits and thumbnail
 - Hierarchical keywords with autocomplete, plus batch metadata editing
 - Collections, collection sets, Quick Collection and smart collections
-- Filter bar with full-text search
+- Filter bar with full-text search, and a Missing filter
 - XMP sidecar read/write that preserves fields written by other apps
+- **Remove or trash, safely.** `Delete` opens a confirmation with two choices: *Remove from Catalog* (the file stays where it is) or *Move to Trash* (the original and its sidecar go to the system trash). Cancel is the default, both choices undo with `Ctrl+Z` (a trashed file is restored from the trash), and there is no permanent delete. A file still used by another photo, such as a virtual copy you did not select, is never trashed. If the move fails, nothing changes
+- **Missing files.** Originals that vanish from disk (a drive unplugged, a folder renamed) are flagged in the background at startup and when you open a folder. They get a ⚠ badge in the Grid, filmstrip and folder tree, a banner with **Locate…** to relink the file (it warns when the type, size or contents differ, and can relink the rest of the folder too), and a Missing filter. Edits are never lost, and a file that comes back clears its own flag
 
 ### Export
 - JPEG, TIFF (8/16-bit; none, LZW or ZIP) and PNG (8/16-bit), with the ICC profile embedded
@@ -67,11 +70,16 @@ If you've ever spent an evening in a well-known room full of light, your fingers
 - White balance, exposure, contrast, highlights, shadows, whites and blacks
 - Tone curve (parametric and point), HSL and B&W mixer
 - Clarity, sharpening, and luminance and color noise reduction
-- Crop and straighten, with overlays
+- Crop and straighten, with overlays; drag outside a corner of the crop box to rotate the image under the box, and double-click inside the box to apply
+- Local adjustments, each with Exposure, Contrast, Highlights, Shadows, Whites and Blacks: **linear gradients** (move, rotate, feather, flip) and **brush zones** (size, feather and flow, erase, mouse-wheel size, mask overlay), up to 16 per photo
+- **Red eye and pet eye** correction (white, green or yellow glow), with darken and an optional catchlight
 - Vignette
 - Histogram, clipping display, before/after, eyedropper, Auto Tone and Auto WB
 - Persistent history, copy/paste settings, and presets (with `.arpreset` import/export)
-- Navigator with zoom
+- Navigator with zoom (Fit, 1:1, 2:1, 3:1, 5:1 and a click-zoom picker)
+
+### Preferences
+- Interface size (scales the whole UI), canvas background, preview size and quality, preview cache budget, daily catalog backups and XMP auto-write
 
 ## Keyboard shortcuts
 
@@ -83,6 +91,8 @@ If you've ever spent an evening in a well-known room full of light, your fingers
 | `B` | Add to Quick Collection |
 | `Ctrl+K` | Focus keyword entry |
 | `Ctrl+[` / `Ctrl+]` | Rotate left / right |
+| `Ctrl+'` | Create a virtual copy |
+| `Delete` / `Backspace` | Remove from catalog or move to trash (asks first) |
 | `Ctrl+S` | Write XMP sidecars |
 | `Ctrl+Shift+E` | Export the selection |
 | `Ctrl+Alt+Shift+E` | Export again with the last settings |
@@ -95,7 +105,13 @@ If you've ever spent an evening in a well-known room full of light, your fingers
 | `W` | White balance eyedropper (Develop) |
 | `V` | Switch color / B&W (Develop) |
 | `\` | Before / after (Develop) |
-| `O` | Cycle crop overlay (Develop) |
+| `R` | Crop & straighten (Develop) |
+| `Shift+R` | Red eye / pet eye (Develop) |
+| `M` / `K` | Gradient / brush zone (Develop) |
+| `Enter` / `Esc` | Apply / cancel the open tool (Develop) |
+| `O` | Cycle crop overlay, or show the mask of a gradient or brush zone (Develop) |
+| `'` | Flip the selected gradient (Develop) |
+| `[` / `]`, `Shift+[` / `Shift+]` | Brush size, feather; the mouse wheel also changes the size, and `Alt` paints as erase (Develop) |
 | `Ctrl+Shift+C` / `Ctrl+Shift+V` | Copy / paste settings (Develop) |
 
 ## Building
@@ -168,6 +184,8 @@ The workspace is split so that the engine, catalog, jobs and services crates nev
 cargo run -p viberoom-cli -- render --help
 ```
 
+It also covers catalog housekeeping: `viberoom-cli catalog list|check-missing|remove|trash`. `remove` and `trash` only print what they would do unless you pass `--yes`.
+
 ## Where things live
 
 | What | Where |
@@ -200,7 +218,7 @@ crates/
   cli/             headless `viberoom-cli`
 ```
 
-Design decisions are recorded as ADRs in [`docs/adr/`](docs/adr), and the full plan is in [`PLAN.md`](PLAN.md).
+Design decisions are recorded as ADRs in [`docs/adr/`](docs/adr).
 
 ## Status
 
@@ -208,16 +226,18 @@ Design decisions are recorded as ADRs in [`docs/adr/`](docs/adr), and the full p
 |---|---|
 | M0 Foundations | Done |
 | M1 Import and browse | Done |
-| M2 Organize | Nearly done (remove-from-catalog and missing-file handling pending) |
+| M2 Organize | Done (remove, trash and missing-file handling are built; the dialogs are awaiting a final click-through) |
 | M3 Develop foundation | Done |
-| M4 Develop tools | Mostly done (image-quality tuning pass pending) |
+| M4 Develop tools | Done, apart from the image-quality tuning pass |
 | M5 Export and v0.1 release | Export, backups, Preferences and packaging done; performance and the release checklist pending |
+| v0.2.0 | Done: red eye and pet eye, gradients, brush zones, crop rotation, remove/trash/missing files. Moved to the next release: lens corrections, spot removal, monitor ICC profiles, and tuning the local whites/blacks/contrast against a reference |
 
 ## Roadmap
 
 - Own GPU demosaic (a full-size export of a 24 MP raw is bound by LibRaw's ~1.1 s CPU decode), 1:1 preview cache
 - Flatpak (after the AUR package)
-- After v0.1: local adjustments (gradients, brushes, masks), spot removal, lens corrections, monitor ICC profiles
+- Planned next: lens corrections (lensfun distortion, vignetting, chromatic aberration), spot removal (clone and heal) and monitor ICC profiles, so the screen matches your calibrated display
+- After that: radial gradients and range masks, soft proofing
 
 ## Contributing
 

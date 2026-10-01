@@ -34,13 +34,14 @@ use crate::error::{Error, Result};
 use crate::gpu::{GpuContext, Kernel, Slot, work_texture};
 use crate::op::Op;
 use crate::ops::{
-    BwMix, Clarity, Exposure, Hsl, Noise, Presence, Profile, ProfileName, Sharpen, Tone, ToneCurve,
-    Treatment, Vignette, WbMode, WhiteBalance, build_luts,
+    BwMix, Clarity, Exposure, Hsl, Noise, Presence, Profile, ProfileName, RedEye, Sharpen, Tone,
+    ToneCurve, Treatment, Vignette, WbMode, WhiteBalance, build_luts,
 };
 use rayon::prelude::*;
 
 use crate::orientation::Orientation;
 use crate::params::EditParams;
+use crate::pipeline_local::{BrushStore, local_plan, redeye_uniform, uniform_key};
 use crate::rawprep::SceneColor;
 use crate::tone::tone_uniform;
 
@@ -70,6 +71,9 @@ pub struct RenderRequest {
     /// Export path: write 16-bit output (read with `read_output_rgba16`)
     /// instead of the dithered 8-bit texture; no overlay or histogram.
     pub depth16: bool,
+    /// Tints the mask of the local adjustment with this id red (the `O`
+    /// overlay of the local tools); ignored for exports.
+    pub mask_overlay: Option<String>,
 }
 
 impl RenderRequest {
@@ -83,6 +87,7 @@ impl RenderRequest {
             ignore_crop: false,
             space: OutputSpace::Srgb,
             depth16: false,
+            mask_overlay: None,
         }
     }
 }
@@ -92,12 +97,15 @@ impl RenderRequest {
 pub struct RanStages {
     pub geometry: bool,
     pub scene: bool,
+    pub red_eye: bool,
     pub highlights_shadows: bool,
     pub tone: bool,
     pub display: bool,
     pub output: bool,
     pub noise: bool,
     pub clarity: bool,
+    pub local: bool,
+    pub mask_overlay: bool,
     pub curve: bool,
     pub hsl: bool,
     pub sharpen: bool,
@@ -140,6 +148,9 @@ struct Kernels {
     blur_rgb: Kernel,
     sharpen: Kernel,
     vignette: Kernel,
+    red_eye: Kernel,
+    local: Kernel,
+    mask_overlay: Kernel,
 }
 
 impl Kernels {
@@ -275,6 +286,40 @@ impl Kernels {
                 "vignette",
                 include_str!("shaders/vignette.wgsl"),
                 &io,
+            ),
+            red_eye: Kernel::new(device, "red_eye", include_str!("shaders/red_eye.wgsl"), &io),
+            local: Kernel::new(
+                device,
+                "local",
+                &format!(
+                    "{}{}",
+                    include_str!("shaders/local_mask.wgsl"),
+                    include_str!("shaders/local.wgsl")
+                ),
+                &[
+                    Slot::Uniform,
+                    Slot::Tex2d { filterable: false },
+                    Slot::Tex2dArray { filterable: true },
+                    Slot::Sampler,
+                    Slot::Tex2d { filterable: true },
+                    Slot::StorageOut(F16),
+                ],
+            ),
+            mask_overlay: Kernel::new(
+                device,
+                "mask_overlay",
+                &format!(
+                    "{}{}",
+                    include_str!("shaders/local_mask.wgsl"),
+                    include_str!("shaders/mask_overlay.wgsl")
+                ),
+                &[
+                    Slot::Uniform,
+                    Slot::Tex2d { filterable: false },
+                    Slot::Tex2dArray { filterable: true },
+                    Slot::Sampler,
+                    Slot::StorageOut(F16),
+                ],
             ),
         }
     }
@@ -567,6 +612,11 @@ pub struct Pipeline {
     sharp_blur: Option<Cached>,
     sharp: Option<Cached>,
     vignette: Option<Cached>,
+    red: Option<Cached>,
+    local: Option<Cached>,
+    base_local: Option<Cached>,
+    overlay: Option<Cached>,
+    brush: BrushStore,
     hist_buf: wgpu::Buffer,
     hist_read: wgpu::Buffer,
     hist_key: Option<u64>,
@@ -702,6 +752,11 @@ impl Pipeline {
             sharp_blur: None,
             sharp: None,
             vignette: None,
+            red: None,
+            local: None,
+            base_local: None,
+            overlay: None,
+            brush: BrushStore::default(),
             hist_buf,
             hist_read,
             hist_key: None,
@@ -784,6 +839,11 @@ impl Pipeline {
             sharp_blur,
             sharp,
             vignette,
+            red,
+            local,
+            base_local,
+            overlay,
+            brush,
             ..
         } = self;
         let device = &ctx.device;
@@ -899,9 +959,36 @@ impl Pipeline {
             );
             ran.scene = true;
         }
-        let Some(scene_tex) = scene.as_ref() else {
+        let Some(scene_raw) = scene.as_ref() else {
             return Err(Error::Readback("scene missing".into()));
         };
+
+        // Stage 2a'': red-eye correction (scene-linear, after white balance
+        // and exposure, before noise reduction).
+        let src_size = (source.w, source.h);
+        let spots = req.params.get::<RedEye>().spots;
+        let (scene_tex, k_scene): (&Cached, u64) =
+            match redeye_uniform(&spots, &geom, dims, src_size) {
+                None => (scene_raw, k_scene),
+                Some(uni) => {
+                    let k_red = Key::chain(k_scene).u(uniform_key(&uni)).finish();
+                    ran.red_eye = run_simple(
+                        device,
+                        &mut enc,
+                        &k.red_eye,
+                        red,
+                        k_red,
+                        dims,
+                        &uni,
+                        &scene_raw.tex,
+                        &[],
+                    );
+                    let Some(r) = red.as_ref() else {
+                        return Err(Error::Readback("red eye missing".into()));
+                    };
+                    (r, k_red)
+                }
+            };
 
         // Stage 2a': noise reduction (scene-linear, before local tone).
         let noise_p = req.params.get::<Noise>();
@@ -1042,6 +1129,63 @@ impl Pipeline {
                 return Err(Error::Readback("clarity missing".into()));
             };
             c
+        };
+
+        // Stage 2d: local adjustments (gradients and brush zones), one pass
+        // in scene-linear between clarity and the tone map.
+        let locals = req.params.local_adjustments();
+        let overlay_id = req.mask_overlay.as_deref().filter(|_| !req.depth16);
+        let plan = local_plan(&locals, overlay_id, &geom, dims, src_size);
+        let mut brush_ctx: Option<(u64, wgpu::TextureView)> = None;
+        let (tone_in, k_tone_in): (&Cached, u64) = match &plan {
+            None => (tone_in, k_tone_in),
+            Some(pl) => {
+                let brush_key = brush.sync(ctx, src_size, &pl.zones);
+                let brush_view = brush.view(device);
+                let k_local = Key::chain(k_tone_in)
+                    .u(uniform_key(&pl.uniform))
+                    .u(brush_key)
+                    .finish();
+                let base_view = if pl.needs_base {
+                    guided_base(
+                        device,
+                        k,
+                        &mut enc,
+                        &tone_in.tex,
+                        base_local,
+                        k_tone_in,
+                        dims,
+                        0.02,
+                    );
+                    let Some(b) = base_local.as_ref() else {
+                        return Err(Error::Readback("local base layer missing".into()));
+                    };
+                    view(&b.tex)
+                } else {
+                    // No Highlights/Shadows: the kernel still binds a base.
+                    view(&tone_in.tex)
+                };
+                ran.local = run_simple(
+                    device,
+                    &mut enc,
+                    &k.local,
+                    local,
+                    k_local,
+                    dims,
+                    &pl.uniform,
+                    &tone_in.tex,
+                    &[
+                        wgpu::BindingResource::TextureView(&brush_view),
+                        wgpu::BindingResource::Sampler(sampler),
+                        wgpu::BindingResource::TextureView(&base_view),
+                    ],
+                );
+                brush_ctx = Some((brush_key, brush_view));
+                let Some(l) = local.as_ref() else {
+                    return Err(Error::Readback("local pass missing".into()));
+                };
+                (l, k_local)
+            }
         };
 
         // Stage 3: tone map.
@@ -1363,6 +1507,34 @@ impl Pipeline {
                 return Err(Error::Readback("vignette missing".into()));
             };
             v
+        };
+
+        // Stage 4f: mask overlay (the local tools' `O` key).
+        let final_tex: &Cached = match (&plan, &brush_ctx) {
+            (Some(pl), Some((brush_key, brush_view))) if pl.overlay.is_some() => {
+                let mut uni = pl.uniform.clone();
+                uni[0][3] = pl.overlay.unwrap_or(0) as f32;
+                k_fx = Key::chain(k_fx).u(uniform_key(&uni)).u(*brush_key).finish();
+                ran.mask_overlay = run_simple(
+                    device,
+                    &mut enc,
+                    &k.mask_overlay,
+                    overlay,
+                    k_fx,
+                    dims,
+                    &uni,
+                    &final_tex.tex,
+                    &[
+                        wgpu::BindingResource::TextureView(brush_view),
+                        wgpu::BindingResource::Sampler(sampler),
+                    ],
+                );
+                let Some(o) = overlay.as_ref() else {
+                    return Err(Error::Readback("mask overlay missing".into()));
+                };
+                o
+            }
+            _ => final_tex,
         };
 
         // Stage 5: output transform.

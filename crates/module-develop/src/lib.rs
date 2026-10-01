@@ -11,10 +11,12 @@ mod filmstrip;
 mod histogram;
 mod history;
 mod left;
+mod local_tool;
 mod navigator;
 mod panels;
 mod preset_dialog;
 mod presets_panel;
+mod tool;
 
 use std::time::{Duration, Instant};
 
@@ -31,6 +33,8 @@ use viberoom_services::session::{Session, open_in_background};
 use viberoom_services::{catalog_develop, develop};
 use viberoom_shell::{AppCx, Module, ModuleId};
 
+use tool::{CanvasTool, ToolAction, ToolId};
+
 /// Slider drags on one control become a history step this long after the
 /// last movement (a database write per frame would stutter).
 const SAVE_DEBOUNCE: Duration = Duration::from_millis(300);
@@ -40,6 +44,8 @@ enum Zoom {
     Fit,
     OneToOne,
     TwoToOne,
+    ThreeToOne,
+    FiveToOne,
 }
 
 impl Zoom {
@@ -48,12 +54,14 @@ impl Zoom {
             Zoom::Fit => None,
             Zoom::OneToOne => Some(1.0),
             Zoom::TwoToOne => Some(2.0),
+            Zoom::ThreeToOne => Some(3.0),
+            Zoom::FiveToOne => Some(5.0),
         }
     }
 }
 
 /// What a render was asked for, to skip identical requests.
-type RenderKey = ([u8; 16], u32, bool, bool, bool);
+type RenderKey = ([u8; 16], u32, bool, bool, bool, Option<String>);
 
 #[derive(Debug)]
 struct Doc {
@@ -109,8 +117,9 @@ pub struct DevelopModule {
     /// Longest edge (px) the last layout wanted the render to have.
     want_edge: u32,
     panels: panels::State,
-    /// The open crop & straighten tool, if any (`R`).
-    crop_tool: Option<crop_tool::CropTool>,
+    /// The open canvas tool, if any: crop (`R`), red eye (`Shift+R`),
+    /// gradient (`M`) or brush (`K`).
+    tool: Option<Box<dyn CanvasTool>>,
     view: Option<ViewInfo>,
     presets: Vec<Preset>,
     presets_loaded: bool,
@@ -120,9 +129,9 @@ pub struct DevelopModule {
     copy_dialog: Option<copy_dialog::CopyDialog>,
     previous: Option<PhotoId>,
     last_pass: u64,
-    /// Dev/test hook: `VIBEROOM_START_TOOL=crop` opens the crop tool as
-    /// soon as the first photo has loaded.
-    start_crop_tool: bool,
+    /// Dev/test hook: `VIBEROOM_START_TOOL=crop|redeye|gradient|brush`
+    /// opens that tool as soon as the first photo has loaded.
+    start_tool: Option<ToolId>,
 }
 
 impl DevelopModule {
@@ -140,7 +149,7 @@ impl DevelopModule {
             eyedropper: false,
             want_edge: 1536,
             panels: panels::State::default(),
-            crop_tool: None,
+            tool: None,
             view: None,
             presets: Vec::new(),
             presets_loaded: false,
@@ -150,7 +159,15 @@ impl DevelopModule {
             copy_dialog: None,
             previous: None,
             last_pass: u64::MAX,
-            start_crop_tool: std::env::var("VIBEROOM_START_TOOL").is_ok_and(|v| v == "crop"),
+            start_tool: std::env::var("VIBEROOM_START_TOOL")
+                .ok()
+                .and_then(|v| match v.as_str() {
+                    "crop" => Some(ToolId::Crop),
+                    "redeye" => Some(ToolId::RedEye),
+                    "gradient" => Some(ToolId::Gradient),
+                    "brush" => Some(ToolId::Brush),
+                    _ => None,
+                }),
         }
     }
 
@@ -171,7 +188,7 @@ impl DevelopModule {
         }
         self.flush_if_due(cx);
         let mut busy = false;
-        let mut open_tool = false;
+        let mut open_tool = None;
         if let Some(doc) = &mut self.doc {
             if let Some(rx) = &doc.loading {
                 match rx.try_recv() {
@@ -179,7 +196,7 @@ impl DevelopModule {
                         doc.session = Some(session);
                         doc.loading = None;
                         doc.last_key = None;
-                        open_tool = std::mem::take(&mut self.start_crop_tool);
+                        open_tool = self.start_tool.take();
                     }
                     Ok(Err(e)) => {
                         doc.error = Some(e);
@@ -220,22 +237,27 @@ impl DevelopModule {
                 }
                 let params = if self.before {
                     EditParams::default()
+                } else if let Some(tool) = &self.tool {
+                    tool.display_params(&doc.params)
                 } else {
                     doc.params.clone()
                 };
-                let ignore_crop = self.crop_tool.is_some();
+                let ignore_crop = self.tool.as_ref().is_some_and(|t| t.ignore_crop());
+                let overlay = self.tool.as_ref().and_then(|t| t.mask_overlay());
                 let key: RenderKey = (
                     params.hash(),
                     self.want_edge,
                     self.clip,
                     self.before,
                     ignore_crop,
+                    overlay.clone(),
                 );
-                if doc.last_key != Some(key) {
+                if doc.last_key.as_ref() != Some(&key) {
                     let mut req = RenderRequest::new(params, self.want_edge);
                     req.orientation = session.orientation;
                     req.clip_overlay = self.clip;
                     req.ignore_crop = ignore_crop;
+                    req.mask_overlay = overlay;
                     req.want_histogram = true;
                     doc.submitted = session.render.submit(req);
                     doc.last_key = Some(key);
@@ -244,8 +266,8 @@ impl DevelopModule {
             }
             busy |= doc.dirty.is_some();
         }
-        if open_tool {
-            self.toggle_crop_tool();
+        if let Some(id) = open_tool {
+            self.open_tool(cx, id);
         }
         if busy {
             ctx.request_repaint_after(Duration::from_millis(16));
@@ -291,7 +313,7 @@ impl DevelopModule {
             }
         }
         self.eyedropper = false;
-        self.crop_tool = None;
+        self.tool = None;
         self.before = false;
         self.pan = egui::Vec2::ZERO;
         self.zoom = Zoom::Fit;
@@ -324,6 +346,14 @@ impl DevelopModule {
             received: 0,
         };
         match (&cx.gpu, info) {
+            // A missing original is not a decode failure: say so, and leave
+            // the photo's edits untouched. Locate… (in the Library) relinks it.
+            (Some(_), Some(info)) if !info.path.exists() => {
+                doc.error = Some(
+                    "The original is missing from disk, so it can't be edited or exported.\nUse Locate… in the Library to find it."
+                        .into(),
+                );
+            }
             (Some(gpu), Some(info)) => {
                 doc.loading = Some(open_in_background(&cx.jobs, gpu.clone(), photo, info));
             }
@@ -491,12 +521,13 @@ impl DevelopModule {
             .iter()
             .map(|o| o.group())
             .filter(|g| {
-                !matches!(
-                    g,
-                    viberoom_services::engine::SettingsGroup::Crop
-                        | viberoom_services::engine::SettingsGroup::Straighten
-                        | viberoom_services::engine::SettingsGroup::ProcessVersion
-                )
+                !g.is_photo_specific()
+                    && !matches!(
+                        g,
+                        viberoom_services::engine::SettingsGroup::Crop
+                            | viberoom_services::engine::SettingsGroup::Straighten
+                            | viberoom_services::engine::SettingsGroup::ProcessVersion
+                    )
             })
             .collect();
         self.paste(cx, &source, &groups, "Paste Previous", true);
@@ -583,6 +614,9 @@ impl DevelopModule {
         match cx.apply_command_event(Box::new(CreateVirtualCopies::new(vec![photo]))) {
             Ok(Some(viberoom_core::events::CatalogEvent::PhotosAdded { ids, .. })) => {
                 if let Some(&copy) = ids.first() {
+                    if let Some(previews) = &cx.previews {
+                        viberoom_services::preview::copy_previews(previews, &[(photo, copy)]);
+                    }
                     cx.selection.select_single(copy);
                 }
             }
@@ -591,21 +625,60 @@ impl DevelopModule {
         }
     }
 
-    /// Opens or closes the crop & straighten tool (`R`).
-    fn toggle_crop_tool(&mut self) {
-        if self.crop_tool.take().is_none()
-            && let Some(doc) = &self.doc
-            && doc.session.is_some()
-        {
-            self.crop_tool = Some(crop_tool::CropTool::new(&doc.params));
-            self.eyedropper = false;
-            self.zoom = Zoom::Fit;
-            self.pan = egui::Vec2::ZERO;
+    /// Opens `id`, or closes it when it is already open. A local tool asked
+    /// to become another local tool keeps its draft; anything else commits
+    /// the open tool first.
+    fn open_tool(&mut self, cx: &mut AppCx, id: ToolId) {
+        if let Some(t) = &mut self.tool {
+            if t.id() == id {
+                self.close_tool(cx, true);
+                return;
+            }
+            if t.switch_to(id) {
+                return;
+            }
+            self.close_tool(cx, true);
+        }
+        let Some(doc) = &self.doc else { return };
+        if doc.session.is_none() {
+            return;
+        }
+        self.tool = Some(match id {
+            ToolId::Crop => Box::new(crop_tool::CropTool::new(&doc.params)),
+            _ => Box::new(local_tool::LocalTool::new(id, &doc.params)),
+        });
+        self.eyedropper = false;
+        self.zoom = Zoom::Fit;
+        self.pan = egui::Vec2::ZERO;
+    }
+
+    /// Closes the open tool; `apply` commits a draft tool's edits as one
+    /// history step.
+    fn close_tool(&mut self, cx: &mut AppCx, apply: bool) {
+        let Some(mut tool) = self.tool.take() else {
+            return;
+        };
+        let Some(doc) = &self.doc else { return };
+        if let Some(out) = tool.finish(apply, &doc.params) {
+            self.apply(cx, out.params, out.change);
         }
     }
 
-    fn apply_outcome(&mut self, cx: &mut AppCx, outcome: crop_tool::Outcome) {
+    fn apply_outcome(&mut self, cx: &mut AppCx, outcome: tool::Outcome) {
         self.apply(cx, outcome.params, outcome.change);
+    }
+
+    /// The geometry the open tool works in.
+    fn tool_geometry(&self) -> Option<viberoom_services::engine::geometry::Geometry> {
+        let doc = self.doc.as_ref()?;
+        let session = doc.session.as_ref()?;
+        let ignore = self.tool.as_ref().is_some_and(|t| t.ignore_crop());
+        Some(viberoom_services::engine::geometry::resolve(
+            session.source_size,
+            session.orientation,
+            &doc.params,
+            ignore,
+        ))
     }
 
     fn toggle_treatment(&mut self, cx: &mut AppCx) {
@@ -748,27 +821,42 @@ impl Module for DevelopModule {
                     ui.small(&doc.exif_line);
                 }
                 ui.add_space(8.0);
-                let mut tool_out = None;
-                let mut tool_done = false;
-                if let Some(mut tool) = self.crop_tool.take() {
-                    if let Some(session) = &doc.session {
-                        let canvas = viberoom_services::engine::geometry::resolve(
-                            session.source_size,
-                            session.orientation,
-                            &doc.params,
-                            true,
-                        )
-                        .canvas;
-                        (tool_out, tool_done) = tool.options(ui, &doc.params, canvas);
+                let mut strip = None;
+                ui.horizontal(|ui| {
+                    let open = self.tool.as_ref().map(|t| t.id());
+                    for id in ToolId::ALL {
+                        if ui
+                            .add_enabled(
+                                doc.session.is_some(),
+                                egui::Button::selectable(open == Some(id), id.label()),
+                            )
+                            .on_hover_text(id.hint())
+                            .clicked()
+                        {
+                            strip = Some(id);
+                        }
                     }
-                    self.crop_tool = Some(tool);
+                });
+                if let Some(id) = strip {
+                    self.open_tool(cx, id);
+                }
+                let geom = self.tool_geometry();
+                let mut tool_out = None;
+                let mut action = ToolAction::None;
+                if let (Some(mut tool), Some(geom), Some(doc)) = (self.tool.take(), geom, &self.doc)
+                {
+                    ui.add_space(6.0);
+                    (tool_out, action) = tool.options(ui, &doc.params, &geom);
+                    self.tool = Some(tool);
                     ui.add_space(8.0);
                 }
                 if let Some(o) = tool_out {
                     self.apply_outcome(cx, o);
                 }
-                if tool_done {
-                    self.crop_tool = None;
+                match action {
+                    ToolAction::Apply => self.close_tool(cx, true),
+                    ToolAction::Cancel => self.close_tool(cx, false),
+                    ToolAction::None => {}
                 }
                 let Some(doc) = &self.doc else { return };
                 ui.heading("Basic");

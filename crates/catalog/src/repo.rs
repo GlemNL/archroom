@@ -214,6 +214,10 @@ pub struct PhotoSummary {
     pub copy_name: Option<String>,
 }
 
+/// Every query that lists or counts photos must filter on this (soft-deleted
+/// photos stay in `photos` until purged). `p` is the `photos` alias.
+pub(crate) const LIVE: &str = "p.removed_at IS NULL";
+
 pub(crate) const PHOTO_SUMMARY_COLUMNS: &str =
     "p.id, f.id, f.folder_id, f.filename, f.kind, f.width, f.height,
      f.orientation, f.capture_time, f.camera_model, p.rating, p.flag, p.color_label, f.missing,
@@ -267,6 +271,7 @@ impl PhotoSort {
 pub fn list_all_photos(conn: &Connection, sort: PhotoSort) -> Result<Vec<PhotoSummary>> {
     let sql = format!(
         "SELECT {PHOTO_SUMMARY_COLUMNS} FROM photos p JOIN files f ON f.id = p.file_id
+         WHERE {LIVE}
          ORDER BY {}",
         sort.order_by()
     );
@@ -283,7 +288,7 @@ pub fn list_photos_for_folder(
 ) -> Result<Vec<PhotoSummary>> {
     let sql = format!(
         "SELECT {PHOTO_SUMMARY_COLUMNS} FROM photos p JOIN files f ON f.id = p.file_id
-         WHERE f.folder_id = ?1
+         WHERE {LIVE} AND f.folder_id = ?1
          ORDER BY {}",
         sort.order_by()
     );
@@ -300,7 +305,7 @@ pub fn list_photos_for_import(
 ) -> Result<Vec<PhotoSummary>> {
     let sql = format!(
         "SELECT {PHOTO_SUMMARY_COLUMNS} FROM photos p JOIN files f ON f.id = p.file_id
-         WHERE p.import_id = ?1
+         WHERE {LIVE} AND p.import_id = ?1
          ORDER BY {}",
         sort.order_by()
     );
@@ -321,9 +326,86 @@ pub fn latest_import_id(conn: &Connection) -> Result<Option<ImportId>> {
     .map_err(Into::into)
 }
 
+/// Hard-deletes soft-deleted photos (and what hangs off them) for good, then
+/// any `files` row left with no photo and any folder left empty. Catalog rows
+/// only: no file on disk is touched. Runs at catalog open, so "Remove" stays
+/// undoable for the whole session. Returns how many photos were purged.
+pub fn purge_removed(conn: &Connection) -> Result<usize> {
+    let ids: Vec<i64> = {
+        let mut stmt = conn.prepare("SELECT id FROM photos WHERE removed_at IS NOT NULL")?;
+        let rows = stmt.query_map([], |r| r.get(0))?;
+        rows.collect::<rusqlite::Result<_>>()?
+    };
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    let tx = conn.unchecked_transaction()?;
+    let files: Vec<(i64, i64)> = {
+        let mut stmt = tx.prepare(
+            "SELECT DISTINCT f.id, f.folder_id FROM files f
+             JOIN photos p ON p.file_id = f.id WHERE p.removed_at IS NOT NULL",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        rows.collect::<rusqlite::Result<_>>()?
+    };
+    for table in [
+        "photo_keywords",
+        "develop_settings",
+        "history",
+        "snapshots",
+        "collection_photos",
+    ] {
+        tx.execute(
+            &format!(
+                "DELETE FROM {table} WHERE photo_id IN
+                 (SELECT id FROM photos WHERE removed_at IS NOT NULL)"
+            ),
+            [],
+        )?;
+    }
+    tx.execute("DELETE FROM photos WHERE removed_at IS NOT NULL", [])?;
+    let mut folders: Vec<i64> = Vec::new();
+    for (file_id, folder_id) in files {
+        let gone = tx.execute(
+            "DELETE FROM files WHERE id = ?1
+             AND NOT EXISTS (SELECT 1 FROM photos WHERE file_id = ?1)",
+            params![file_id],
+        )?;
+        if gone > 0 {
+            folders.push(folder_id);
+        }
+    }
+    // Walk up from each folder that lost a file, deleting it while it is empty.
+    for mut folder in folders {
+        loop {
+            let parent: Option<Option<i64>> = tx
+                .query_row(
+                    "SELECT parent_id FROM folders WHERE id = ?1
+                     AND NOT EXISTS (SELECT 1 FROM files WHERE folder_id = ?1)
+                     AND NOT EXISTS (SELECT 1 FROM folders c WHERE c.parent_id = ?1)",
+                    params![folder],
+                    |r| r.get(0),
+                )
+                .optional()?;
+            let Some(parent) = parent else { break };
+            tx.execute("DELETE FROM folders WHERE id = ?1", params![folder])?;
+            match parent {
+                Some(p) => folder = p,
+                None => break,
+            }
+        }
+    }
+    tx.commit()?;
+    Ok(ids.len())
+}
+
 pub fn count_all_photos(conn: &Connection) -> Result<i64> {
-    conn.query_row("SELECT count(*) FROM photos", [], |row| row.get(0))
-        .map_err(Into::into)
+    conn.query_row(
+        "SELECT count(*) FROM photos p WHERE p.removed_at IS NULL",
+        [],
+        |row| row.get(0),
+    )
+    .map_err(Into::into)
 }
 
 /// A `folders` row plus how many files sit directly in it. Not a recursive
@@ -337,12 +419,16 @@ pub struct FolderRow {
     pub name: String,
     pub path: String,
     pub file_count: i64,
+    /// Of those, how many are flagged missing on disk.
+    pub missing_count: i64,
 }
 
 pub fn list_folders(conn: &Connection) -> Result<Vec<FolderRow>> {
     let mut stmt = conn.prepare(
-        "SELECT fo.id, fo.parent_id, fo.name, fo.path, count(fi.id)
+        "SELECT fo.id, fo.parent_id, fo.name, fo.path, count(fi.id),
+                coalesce(sum(fi.missing != 0), 0)
          FROM folders fo LEFT JOIN files fi ON fi.folder_id = fo.id
+              AND EXISTS (SELECT 1 FROM photos p WHERE p.file_id = fi.id AND p.removed_at IS NULL)
          GROUP BY fo.id
          ORDER BY fo.path",
     )?;
@@ -353,6 +439,7 @@ pub fn list_folders(conn: &Connection) -> Result<Vec<FolderRow>> {
             name: row.get(2)?,
             path: row.get(3)?,
             file_count: row.get(4)?,
+            missing_count: row.get(5)?,
         })
     })?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
@@ -406,6 +493,7 @@ pub fn list_keywords(conn: &Connection) -> Result<Vec<KeywordRow>> {
     let mut stmt = conn.prepare(
         "SELECT k.id, k.parent_id, k.name, k.include_on_export, count(pk.photo_id)
          FROM keywords k LEFT JOIN photo_keywords pk ON pk.keyword_id = k.id
+              AND EXISTS (SELECT 1 FROM photos p WHERE p.id = pk.photo_id AND p.removed_at IS NULL)
          GROUP BY k.id
          ORDER BY k.name",
     )?;

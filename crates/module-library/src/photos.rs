@@ -60,10 +60,36 @@ impl LibraryData {
             }
         }
 
+        // Look for originals that vanished (or came back) whenever the
+        // browsed source changes, and once at start: a background job, so a
+        // slow drive never stalls the UI.
+        if self.last_source != Some(cx.selection.source) {
+            match cx.selection.source {
+                LibrarySource::Folder(id) => self.check_missing(cx, Some(id)),
+                // The whole catalog is scanned once at start, not on every
+                // switch back to "All Photographs" (a NAS makes that slow).
+                _ if self.last_source.is_none() => self.check_missing(cx, None),
+                _ => {}
+            }
+        }
+
         if needs_refresh {
             self.refresh(cx);
             self.last_source = Some(cx.selection.source);
             self.last_filter = Some(self.filter.clone());
+        }
+    }
+
+    /// Queues a missing-file check (`None` = the whole catalog). It publishes
+    /// `PhotosChanged { Missing }` only if some flag actually flipped.
+    pub fn check_missing(&self, cx: &AppCx, folder: Option<viberoom_core::ids::FolderId>) {
+        if let Some(catalog_path) = cx.settings.last_catalog.clone() {
+            cx.jobs
+                .submit(viberoom_services::library::CheckMissingJob::new(
+                    catalog_path,
+                    folder,
+                    cx.events.clone(),
+                ));
         }
     }
 

@@ -37,12 +37,23 @@ pub enum SettingsGroup {
     Crop,
     Straighten,
     Effects,
+    RedEye,
+    LocalAdjustments,
     ProcessVersion,
 }
 
 impl SettingsGroup {
+    /// Groups tied to one specific photo (circles and masks placed on it):
+    /// presets never carry them and copy/paste leaves them unchecked.
+    pub fn is_photo_specific(self) -> bool {
+        matches!(
+            self,
+            SettingsGroup::RedEye | SettingsGroup::LocalAdjustments
+        )
+    }
+
     /// Every group, in panel order.
-    pub const ALL: [SettingsGroup; 14] = [
+    pub const ALL: [SettingsGroup; 16] = [
         SettingsGroup::TreatmentProfile,
         SettingsGroup::WhiteBalance,
         SettingsGroup::BasicTone,
@@ -56,6 +67,8 @@ impl SettingsGroup {
         SettingsGroup::Crop,
         SettingsGroup::Straighten,
         SettingsGroup::Effects,
+        SettingsGroup::RedEye,
+        SettingsGroup::LocalAdjustments,
         SettingsGroup::ProcessVersion,
     ];
 
@@ -74,6 +87,8 @@ impl SettingsGroup {
             SettingsGroup::Crop => "Crop",
             SettingsGroup::Straighten => "Straighten",
             SettingsGroup::Effects => "Effects",
+            SettingsGroup::RedEye => "Red Eye",
+            SettingsGroup::LocalAdjustments => "Local Adjustments",
             SettingsGroup::ProcessVersion => "Process Version",
         }
     }

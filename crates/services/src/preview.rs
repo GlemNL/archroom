@@ -57,6 +57,47 @@ pub fn generate_and_store(
     Ok(previews.store(photo_id, level, DEFAULT_PARAMS_HASH, &jpeg, w, h)?)
 }
 
+/// Gives each `(master, copy)` pair's copy the master's previews (L1 and L2)
+/// so a new virtual copy shows its picture immediately.
+pub fn copy_previews(previews: &PreviewCache, pairs: &[(PhotoId, PhotoId)]) {
+    for &(src, dst) in pairs {
+        for level in [viberoom_preview::LEVEL_L1, viberoom_preview::LEVEL_L2] {
+            if let Err(e) = previews.copy_entry(src, dst, level) {
+                tracing::warn!(error = %e, "could not copy a preview to a virtual copy");
+            }
+        }
+    }
+}
+
+/// Fills in previews for virtual copies that have none (made before
+/// `copy_previews` existed, or whose preview was trimmed): each copy borrows
+/// from another photo using the same file.
+pub fn backfill_virtual_copy_previews(
+    conn: &rusqlite::Connection,
+    previews: &PreviewCache,
+) -> rusqlite::Result<()> {
+    let mut stmt = conn.prepare(
+        "SELECT c.id, s.id FROM photos c JOIN photos s ON s.file_id = c.file_id AND s.id != c.id
+         WHERE c.copy_name IS NOT NULL AND c.removed_at IS NULL AND s.removed_at IS NULL
+         ORDER BY c.id, s.copy_name IS NOT NULL, s.id",
+    )?;
+    let rows = stmt.query_map([], |r| {
+        Ok((PhotoId::new(r.get(0)?), PhotoId::new(r.get(1)?)))
+    })?;
+    for row in rows {
+        let (copy, sibling) = row?;
+        if previews
+            .lookup(copy, viberoom_preview::LEVEL_L1)
+            .ok()
+            .flatten()
+            .is_none()
+        {
+            copy_previews(previews, &[(sibling, copy)]);
+        }
+    }
+    Ok(())
+}
+
 /// Same as [`generate_and_store`], but skips work if `level` is already
 /// cached — the common case for Loupe, which asks every frame until the
 /// preview lands.
@@ -77,7 +118,7 @@ pub fn ensure_cached(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use viberoom_preview::LEVEL_L2;
+    use viberoom_preview::{LEVEL_L1, LEVEL_L2};
 
     fn make_test_png(dir: &Path) -> PathBuf {
         let path = dir.join("a.png");
@@ -85,6 +126,48 @@ mod tests {
             image::RgbImage::from_fn(40, 30, |x, y| image::Rgb([x as u8 * 5, y as u8 * 5, 200]));
         img.save(&path).unwrap();
         path
+    }
+
+    #[test]
+    fn backfill_gives_virtual_copies_their_masters_preview() {
+        use viberoom_catalog::command::{Command, CreateVirtualCopies};
+        use viberoom_catalog::{Catalog, repo};
+        let dir = tempfile::tempdir().unwrap();
+        let catalog = Catalog::create_or_open(dir.path().join("t.arcat")).unwrap();
+        let conn = catalog.connection();
+        let folder = repo::upsert_folder_path(conn, dir.path()).unwrap();
+        let file = repo::insert_file(
+            conn,
+            &repo::NewFile {
+                folder_id: folder,
+                filename: "a.jpg",
+                ext: "jpg",
+                kind: "jpeg",
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let master = repo::insert_photo(
+            conn,
+            &repo::NewPhoto {
+                file_id: file,
+                import_id: None,
+            },
+        )
+        .unwrap();
+        let mut cmd = CreateVirtualCopies::new(vec![master]);
+        cmd.apply(conn).unwrap();
+        let copy = cmd.created()[0];
+
+        let previews = PreviewCache::open_at(&dir.path().join("previews")).unwrap();
+        previews
+            .store(master, LEVEL_L1, DEFAULT_PARAMS_HASH, b"jpeg", 8, 6)
+            .unwrap();
+        assert!(previews.lookup(copy, LEVEL_L1).unwrap().is_none());
+
+        backfill_virtual_copy_previews(conn, &previews).unwrap();
+        let p = previews.lookup(copy, LEVEL_L1).unwrap().unwrap();
+        assert_eq!(std::fs::read(p).unwrap(), b"jpeg");
     }
 
     #[test]

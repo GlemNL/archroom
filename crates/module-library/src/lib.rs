@@ -9,13 +9,17 @@ mod filter_bar;
 mod grid;
 mod import_dialog;
 mod left_panel;
+mod locate_dialog;
 mod loupe;
 mod photos;
+mod remove_dialog;
 mod right_panel;
 mod shortcuts;
 
 use import_dialog::ImportDialogState;
+use locate_dialog::LocateDialog;
 use photos::LibraryData;
+use remove_dialog::RemoveDialog;
 use right_panel::RightPanelState;
 use viberoom_services::command::{RotatePhotos, SetFlag};
 use viberoom_shell::{AppCx, ExportRequestKind, Module, ModuleId};
@@ -33,6 +37,8 @@ pub struct LibraryModule {
     zoom: loupe::Zoom,
     thumbnail_size: f32,
     import_dialog: Option<ImportDialogState>,
+    remove_dialog: Option<RemoveDialog>,
+    locate_dialog: Option<LocateDialog>,
     right_panel: RightPanelState,
     collections_ui: collections_panel::CollectionsUi,
 }
@@ -45,6 +51,8 @@ impl LibraryModule {
             zoom: loupe::Zoom::default(),
             thumbnail_size: 160.0,
             import_dialog: None,
+            remove_dialog: None,
+            locate_dialog: None,
             right_panel: RightPanelState::default(),
             collections_ui: collections_panel::CollectionsUi::default(),
         }
@@ -103,23 +111,16 @@ impl Module for LibraryModule {
                 ui.add(egui::Slider::new(&mut self.thumbnail_size, 80.0..=320.0).show_value(false));
             }
             View::Loupe => {
-                if ui
-                    .selectable_label(self.zoom == loupe::Zoom::Fit, "Fit")
-                    .clicked()
-                {
-                    self.zoom = loupe::Zoom::Fit;
-                }
-                if ui
-                    .selectable_label(self.zoom == loupe::Zoom::OneToOne, "1:1")
-                    .clicked()
-                {
-                    self.zoom = loupe::Zoom::OneToOne;
-                }
-                if ui
-                    .selectable_label(self.zoom == loupe::Zoom::TwoToOne, "2:1")
-                    .clicked()
-                {
-                    self.zoom = loupe::Zoom::TwoToOne;
+                for (z, name) in [
+                    (loupe::Zoom::Fit, "Fit"),
+                    (loupe::Zoom::OneToOne, "1:1"),
+                    (loupe::Zoom::TwoToOne, "2:1"),
+                    (loupe::Zoom::ThreeToOne, "3:1"),
+                    (loupe::Zoom::FiveToOne, "5:1"),
+                ] {
+                    if ui.selectable_label(self.zoom == z, name).clicked() {
+                        self.zoom = z;
+                    }
                 }
                 viberoom_shell::click_zoom_picker(ui, cx);
             }
@@ -155,6 +156,13 @@ impl Module for LibraryModule {
                 .clicked()
             {
                 let _ = cx.apply_command(Box::new(RotatePhotos::new(shortcuts::targets(cx), 1)));
+            }
+            if ui
+                .button("🗑")
+                .on_hover_text("Remove from catalog or move to trash (Delete)")
+                .clicked()
+            {
+                self.remove_dialog = RemoveDialog::open(cx, shortcuts::targets(cx));
             }
         });
 
@@ -207,6 +215,24 @@ impl Module for LibraryModule {
         filter_bar::show(ui, &mut self.data.filter, self.data.photos.len());
         ui.separator();
 
+        let missing_active = cx
+            .selection
+            .active
+            .and_then(|id| self.data.photos.iter().find(|p| p.photo_id == id))
+            .filter(|p| p.missing);
+        if let Some(photo) = missing_active {
+            ui.horizontal(|ui| {
+                ui.colored_label(
+                    egui::Color32::from_rgb(0xe5, 0xa0, 0x35),
+                    format!("⚠ The original of {} is missing from disk.", photo.filename),
+                );
+                if ui.button("Locate…").clicked() && self.locate_dialog.is_none() {
+                    self.locate_dialog = Some(LocateDialog::open(photo.photo_id, &photo.filename));
+                }
+            });
+            ui.separator();
+        }
+
         if self.data.photos.is_empty() {
             let msg = if self.data.filter.is_active() {
                 "No photos match the filter."
@@ -218,7 +244,17 @@ impl Module for LibraryModule {
             });
         } else {
             let ordered = self.data.ordered_ids();
-            shortcuts::handle(ui, cx, &ordered, &mut self.right_panel.focus_keyword_entry);
+            let mut want_remove = false;
+            shortcuts::handle(
+                ui,
+                cx,
+                &ordered,
+                &mut self.right_panel.focus_keyword_entry,
+                &mut want_remove,
+            );
+            if want_remove && self.remove_dialog.is_none() {
+                self.remove_dialog = RemoveDialog::open(cx, shortcuts::targets(cx));
+            }
 
             match self.view {
                 View::Grid => {
@@ -234,6 +270,30 @@ impl Module for LibraryModule {
                         self.zoom = z;
                     }
                 }
+            }
+        }
+
+        if let Some(dialog) = &mut self.remove_dialog {
+            egui::Window::new("Remove Photos")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+                .default_width(420.0)
+                .show(ui.ctx(), |ui| dialog.ui(ui, cx));
+            if dialog.should_close {
+                self.remove_dialog = None;
+            }
+        }
+
+        if let Some(dialog) = &mut self.locate_dialog {
+            egui::Window::new("Locate Original")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+                .default_width(460.0)
+                .show(ui.ctx(), |ui| dialog.ui(ui, cx));
+            if dialog.should_close {
+                self.locate_dialog = None;
             }
         }
 

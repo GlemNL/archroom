@@ -42,10 +42,11 @@ pub fn folders_panel(ui: &mut egui::Ui, cx: &mut AppCx, data: &mut LibraryData) 
         ui.heading("Folders");
         if ui
             .small_button("🔄")
-            .on_hover_text("Refresh from the catalog (a full disk resync is a later feature)")
+            .on_hover_text("Refresh, and check the originals are still on disk")
             .clicked()
         {
             data.refresh(cx);
+            data.check_missing(cx, None);
         }
     });
     ui.add_space(4.0);
@@ -66,7 +67,20 @@ pub fn folders_panel(ui: &mut egui::Ui, cx: &mut AppCx, data: &mut LibraryData) 
                     ui.add_space(depth as f32 * 12.0);
                     let selected = cx.selection.source == LibrarySource::Folder(folder.id);
                     let label = format!("{} ({})", folder.name, folder.file_count);
-                    if ui.selectable_label(selected, label).clicked() {
+                    let label = if folder.missing_count > 0 {
+                        egui::RichText::new(format!("⚠ {label}"))
+                            .color(egui::Color32::from_rgb(0xe5, 0xa0, 0x35))
+                    } else {
+                        egui::RichText::new(label)
+                    };
+                    let mut resp = ui.selectable_label(selected, label);
+                    if folder.missing_count > 0 {
+                        resp = resp.on_hover_text(format!(
+                            "{} file(s) in this folder are missing from disk",
+                            folder.missing_count
+                        ));
+                    }
+                    if resp.clicked() {
                         cx.selection.source = LibrarySource::Folder(folder.id);
                     }
                     if ui

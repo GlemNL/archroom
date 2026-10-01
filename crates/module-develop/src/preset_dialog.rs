@@ -26,6 +26,8 @@ impl PresetDialog {
     pub fn new_from(m: &DevelopModule) -> Option<Self> {
         let doc = m.doc.as_ref()?;
         let mut groups = group_list(&m.registry, &doc.params);
+        // Red eye and local masks are tied to this photo: not offered.
+        groups.retain(|(g, _)| !g.is_photo_specific());
         for (g, on) in &mut groups {
             if matches!(
                 g,

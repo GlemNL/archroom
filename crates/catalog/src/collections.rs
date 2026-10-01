@@ -167,7 +167,8 @@ pub fn remove_photos(
 pub fn list_collections(conn: &Connection) -> Result<Vec<CollectionRow>> {
     let mut stmt = conn.prepare(
         "SELECT c.id, c.parent_id, c.kind, c.name, c.rules,
-                (SELECT count(*) FROM collection_photos cp WHERE cp.collection_id = c.id)
+                (SELECT count(*) FROM collection_photos cp JOIN photos p ON p.id = cp.photo_id
+                 WHERE cp.collection_id = c.id AND p.removed_at IS NULL)
          FROM collections c ORDER BY c.name COLLATE NOCASE",
     )?;
     let rows = stmt.query_map([], |r| {
@@ -228,7 +229,7 @@ pub fn list_photos(
     match_all: bool,
     sort: PhotoSort,
 ) -> Result<Vec<PhotoSummary>> {
-    let mut clauses: Vec<String> = Vec::new();
+    let mut clauses: Vec<String> = vec![crate::repo::LIVE.to_string()];
     let mut params: Vec<Value> = Vec::new();
     let mut smart: Option<SmartRules> = None;
 
@@ -380,6 +381,16 @@ mod tests {
             ["img3.nef"]
         );
         assert_eq!(ids(&[Rule::Edited { edited: false }], true).len(), 4);
+
+        // The Missing filter follows `files.missing`.
+        assert!(ids(&[Rule::Missing { missing: true }], true).is_empty());
+        conn.execute(
+            "UPDATE files SET missing = 1 WHERE filename = 'img2.nef'",
+            [],
+        )
+        .unwrap();
+        assert_eq!(ids(&[Rule::Missing { missing: true }], true).len(), 1);
+        assert_eq!(ids(&[Rule::Missing { missing: false }], true).len(), 3);
     }
 
     #[test]

@@ -84,6 +84,20 @@ fn finish_open(
     if let Err(e) = cx.settings.save() {
         error!(error = %e, "failed to save settings");
     }
+    if take_backup {
+        // Photos removed last session are final now (rows only, never files).
+        if let Err(e) = catalog.purge_removed() {
+            error!(error = %e, "failed to purge removed photos");
+        }
+    }
+    if let Some(previews) = &cx.previews
+        && let Err(e) = viberoom_services::preview::backfill_virtual_copy_previews(
+            catalog.connection(),
+            previews,
+        )
+    {
+        error!(error = %e, "failed to backfill virtual copy previews");
+    }
     cx.catalog = Some(catalog);
 
     let (tx, rx) = crossbeam_channel::unbounded();
@@ -113,6 +127,8 @@ pub struct ViberoomApp {
     problem: Option<Problem>,
     backup_rx: Receiver<BackupOutcome>,
     backup_note: Option<String>,
+    /// The interface scale last handed to egui (0 until the first frame).
+    applied_ui_scale: f32,
 }
 
 impl ViberoomApp {
@@ -177,6 +193,7 @@ impl ViberoomApp {
             problem,
             backup_rx,
             backup_note: None,
+            applied_ui_scale: 0.0,
         }
     }
 
@@ -367,6 +384,11 @@ impl ViberoomApp {
 
 impl eframe::App for ViberoomApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let scale = self.cx.settings.ui_scale.clamp(0.75, 3.0);
+        if scale != self.applied_ui_scale {
+            ctx.set_zoom_factor(scale);
+            self.applied_ui_scale = scale;
+        }
         self.drain_job_events();
         if let Ok(outcome) = self.backup_rx.try_recv()
             && let Some(e) = outcome.error

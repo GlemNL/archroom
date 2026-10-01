@@ -1,6 +1,6 @@
 # Maintainer: Clément L <a.kenbari@gmail.com>
 pkgname=viberoom
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
 pkgdesc='Photo catalog and raw developer with a Lightroom-style workflow (Library and Develop)'
 arch=('x86_64')
@@ -15,7 +15,7 @@ optdepends=('vulkan-radeon: Vulkan driver for AMD GPUs'
             'xdg-desktop-portal: file pickers for Import and Export')
 options=('!lto')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
-sha256sums=('SKIP') # replace with the tag's checksum when v0.1.0 is published
+sha256sums=('SKIP') # replace with the tag's checksum when v0.2.0 is published
 
 prepare() {
   cd "$pkgname-$pkgver"
