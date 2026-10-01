@@ -102,6 +102,14 @@ impl View<'_> {
         self.geom.output_to_source(u, v)
     }
 
+    /// Like [`to_src`](Self::to_src) but also for positions off the photo
+    /// (brush strokes may spill past its edge).
+    fn to_src_free(&self, pos: Pos2) -> [f64; 2] {
+        let u = f64::from((pos.x - self.img.left()) / self.img.width());
+        let v = f64::from((pos.y - self.img.top()) / self.img.height());
+        self.geom.output_to_source_unbounded(u, v)
+    }
+
     fn to_screen(&self, p: [f64; 2]) -> Pos2 {
         let [u, v] = self.geom.source_to_output(p[0], p[1]);
         Pos2::new(
@@ -616,7 +624,7 @@ impl LocalTool {
     // --- Canvas: brush -------------------------------------------------------
 
     fn brush_canvas(&mut self, ui: &Ui, v: &View, resp: &Response) {
-        let painter = ui.painter_at(v.img.expand(2.0));
+        let painter = ui.painter_at(ui.clip_rect());
         let selected = self.selected();
         for (i, a) in self.adjustments.iter().enumerate() {
             if let MaskDef::Brush { strokes } = &a.mask
@@ -634,7 +642,7 @@ impl LocalTool {
         }
         let alt = ui.input(|i| i.modifiers.alt);
         let radius = v.len_px(self.brush.size) / 2.0;
-        if let Some(pos) = resp.hover_pos().filter(|p| v.img.contains(*p)) {
+        if let Some(pos) = resp.hover_pos() {
             ui.ctx().set_cursor_icon(CursorIcon::None);
             let col = if alt {
                 Color32::from_rgb(255, 120, 120)
@@ -662,9 +670,7 @@ impl LocalTool {
             && let Some(pos) = resp.interact_pointer_pos()
             && last.distance(pos) >= (radius / 4.0).max(1.0)
         {
-            if let Some(p) = v.to_src(pos) {
-                self.extend_stroke(p);
-            }
+            self.extend_stroke(v.to_src_free(pos));
             self.drag = Some(Drag::Paint { last: pos });
         }
         if resp.drag_stopped() {
@@ -672,7 +678,6 @@ impl LocalTool {
         }
         if resp.clicked()
             && let Some(pos) = resp.interact_pointer_pos()
-            && v.img.contains(pos)
         {
             if self.pin_at(v, pos).is_some() {
                 self.pick_pin(v, pos);
@@ -685,9 +690,7 @@ impl LocalTool {
     /// Starts a stroke (a dab when it never moves) in the selected zone,
     /// creating one first when none is selected.
     fn begin_stroke(&mut self, v: &View, pos: Pos2, erase: bool) -> bool {
-        let Some(p) = v.to_src(pos) else {
-            return false;
-        };
+        let p = v.to_src_free(pos);
         let idx = match self
             .selected()
             .filter(|i| matches!(self.adjustments[*i].mask, MaskDef::Brush { .. }))

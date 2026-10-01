@@ -41,20 +41,27 @@ impl Geometry {
     /// source image (normalised), the CPU twin of the geometry kernel.
     /// `None` when it falls outside the rotated image.
     pub fn output_to_source(&self, u: f64, v: f64) -> Option<[f64; 2]> {
+        let p = self.output_to_source_unbounded(u, v);
+        let inside = (0.0..=1.0).contains(&p[0]) && (0.0..=1.0).contains(&p[1]);
+        // The orientation is a signed permutation, so it keeps the unit
+        // square: testing after it is equivalent to testing before.
+        inside.then_some(p)
+    }
+
+    /// Like [`output_to_source`](Self::output_to_source) but without the
+    /// bounds check: positions off the image map outside 0..1.
+    pub fn output_to_source_unbounded(&self, u: f64, v: f64) -> [f64; 2] {
         let (w, h) = (f64::from(self.canvas.0), f64::from(self.canvas.1));
         let cx = self.crop[0] + u * (self.crop[2] - self.crop[0]);
         let cy = self.crop[1] + v * (self.crop[3] - self.crop[1]);
         let (qx, qy) = rotate(cx * w - w / 2.0, cy * h - h / 2.0, -self.angle_deg);
         let (ox, oy) = ((qx + w / 2.0) / w, (qy + h / 2.0) / h);
-        if !(0.0..=1.0).contains(&ox) || !(0.0..=1.0).contains(&oy) {
-            return None;
-        }
         let m = self.orientation.0;
         let (dx, dy) = (ox - 0.5, oy - 0.5);
-        Some([
+        [
             f64::from(m[0][0]) * dx + f64::from(m[0][1]) * dy + 0.5,
             f64::from(m[1][0]) * dx + f64::from(m[1][1]) * dy + 0.5,
-        ])
+        ]
     }
 }
 
