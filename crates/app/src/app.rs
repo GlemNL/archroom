@@ -113,6 +113,8 @@ pub struct ViberoomApp {
     problem: Option<Problem>,
     backup_rx: Receiver<BackupOutcome>,
     backup_note: Option<String>,
+    /// The interface scale last handed to egui (0 until the first frame).
+    applied_ui_scale: f32,
 }
 
 impl ViberoomApp {
@@ -177,6 +179,7 @@ impl ViberoomApp {
             problem,
             backup_rx,
             backup_note: None,
+            applied_ui_scale: 0.0,
         }
     }
 
@@ -367,6 +370,11 @@ impl ViberoomApp {
 
 impl eframe::App for ViberoomApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let scale = self.cx.settings.ui_scale.clamp(0.75, 3.0);
+        if scale != self.applied_ui_scale {
+            ctx.set_zoom_factor(scale);
+            self.applied_ui_scale = scale;
+        }
         self.drain_job_events();
         if let Ok(outcome) = self.backup_rx.try_recv()
             && let Some(e) = outcome.error

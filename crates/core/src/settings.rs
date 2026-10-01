@@ -54,6 +54,8 @@ pub struct Settings {
     pub xmp_auto_write: XmpAutoWrite,
     /// The zoom a click on a full-screen photo toggles to from Fit.
     pub click_zoom: ClickZoom,
+    /// Scale of the whole interface (text included); 1.0 is the default size.
+    pub ui_scale: f32,
     /// Standard-preview long edge in pixels (L2, plan §5.4).
     pub preview_long_edge: u32,
     pub preview_jpeg_quality: u8,
@@ -74,6 +76,7 @@ impl Default for Settings {
             center_background: CenterBackground::default(),
             xmp_auto_write: XmpAutoWrite::default(),
             click_zoom: ClickZoom::default(),
+            ui_scale: 1.0,
             preview_long_edge: 2048,
             preview_jpeg_quality: 90,
             cache_budget_mb: 5 * 1024,

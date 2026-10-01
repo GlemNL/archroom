@@ -22,6 +22,8 @@ pub struct PreferencesUi {
 }
 
 const PREVIEW_EDGES: [u32; 6] = [1024, 1536, 2048, 2560, 3072, 4096];
+/// Interface scale choices, in percent.
+const UI_SCALES: [u32; 6] = [100, 115, 130, 150, 175, 200];
 
 impl PreferencesUi {
     pub fn toggle(&mut self, cx: &AppCx) {
@@ -169,6 +171,15 @@ impl PreferencesUi {
                             }
                         });
                     ui.weak("Takes effect the next time Viberoom starts.");
+                });
+                ui.end_row();
+
+                ui.label("Interface size");
+                ui.horizontal(|ui| {
+                    for pct in UI_SCALES {
+                        let v = pct as f32 / 100.0;
+                        ui.selectable_value(&mut s.ui_scale, v, format!("{pct}%"));
+                    }
                 });
                 ui.end_row();
 
